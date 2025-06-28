@@ -4,6 +4,7 @@ import pandas_datareader.data as web
 import datetime
 from fredapi import Fred
 import io
+import os
 import collections
 import altair as alt
 from statsmodels.tsa.stattools import adfuller
