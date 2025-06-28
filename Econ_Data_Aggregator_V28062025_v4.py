@@ -21,7 +21,7 @@ This application allows you to download, process, and analyze macroeconomic data
 """)
 
 # --- FRED API Key Setup ---
-FRED_API_KEY = "1bef8a463132e1f36f04a5fd56a92cc0"
+os.environ['FRED_API_KEY'] = st.secrets['FRED_API_KEY']
 if not FRED_API_KEY:
     st.error("FRED API Key is missing. Please provide a valid key to proceed.")
     st.stop()
