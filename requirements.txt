@@ -1,0 +1,11 @@
+streamlit 
+pandas 
+pandas_datareader 
+fredapi 
+openpyxl 
+pyngrok 
+statsmodels 
+python-docx 
+vl-convert-python 
+xlsxwriter
+
