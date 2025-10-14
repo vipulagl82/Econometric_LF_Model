@@ -319,16 +319,28 @@ if st.session_state.screen == 'data_selection':
                             
                             st.toast("Data processed.")
                             
-                            if processed_series_list:
-                                final_data = pd.concat(processed_series_list, axis=1, join='outer').groupby(level=0).first().sort_index().dropna(how='all')
+                        if processed_series_list:
+                                # 1. Concatenate all series (initial raw concatenation)
+                                final_data = pd.concat(processed_series_list, axis=1, join='outer').sort_index()
+                                
+                                # 2. Convert to PeriodIndex for guaranteed unique grouping by frequency (e.g., 2024Q1)
+                                target_freq_code = freq_map.get(target_frequency)
+                                final_data.index = final_data.index.to_period(target_freq_code)
+                                
+                                # 3. Group by the unique period and take the first value for non-NaN columns
+                                #    (Effectively cleaning up any minor timestamp differences within the same period)
+                                final_data = final_data.groupby(level=0).agg(lambda x: x.iloc[0]).to_timestamp(how='end')
+
+                                # 4. Rename columns for display
                                 id_to_display_name = {v['id']: k for k, v in PREDEFINED_SERIES.items()}
                                 final_data.rename(columns={col: id_to_display_name.get(col, col) for col in final_data.columns}, inplace=True)
                                 
-                                st.session_state.analysis_data = final_data
+                                st.session_state.analysis_data = final_data.dropna(how='all') # Add final dropna
                                 st.session_state.target_frequency = target_frequency
                                 st.session_state.screen = 'analysis'
                                 st.session_state.analysis_results = None # Clear old results
                                 st.rerun()
+
                             else:
                                 st.warning("No data returned for the selected criteria. Please adjust your selections.")
 
