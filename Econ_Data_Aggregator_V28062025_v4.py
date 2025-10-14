@@ -11,7 +11,7 @@ from docx import Document
 from docx.shared import Inches
 import numpy as np # Added for CSV processing
 
-# --- Streamlit App Configuration ---
+# --- Streamlit App Configuration ---\
 st.set_page_config(layout="wide", page_title="FRED Macro Data Downloader & Analyzer")
 
 st.title("Enhanced FRED Macro Data Downloader & Analyzer")
@@ -62,16 +62,14 @@ PREDEFINED_SERIES = {
     "Retail Sales: Total Retail Sales (Millions of Dollars)": {
         "id": "RSXFS", "units": "Millions of Dollars", "frequency": "Monthly", "description": "Retail and Food Services Sales, Seasonally Adjusted", "category": "Consumer"
     },
-    "Consumer Sentiment: University of Michigan Index": {
-        "id": "UMCSENT", "units": "Index (1966:Q1=100)", "frequency": "Monthly", "description": "University of Michigan: Consumer Sentiment", "notes": "Seasonally Adjusted", "category": "Consumer"
+    "HPI: S&P/Case-Shiller U.S. National Home Price Index": {
+        "id": "CSUSHPISA", "units": "Index (Jan 2000=100)", "frequency": "Quarterly", "description": "S&P/Case-Shiller U.S. National Home Price Index, Seasonally Adjusted", "category": "Consumer"
     },
-    # Income
     "Real Disposable Personal Income (Billions of Chained 2017 Dollars)": {
-        "id": "DSPIC96", "units": "Billions of Chained 2017 Dollars", "frequency": "Monthly", "description": "Real Disposable Personal Income", "notes": "Seasonally Adjusted Annual Rate", "category": "Income"
+        "id": "DSPIC96", "units": "Billions of Chained 2017 Dollars", "frequency": "Monthly", "description": "Real Disposable Personal Income, Seasonally Adjusted", "category": "Consumer"
     },
-    # Housing
-    "Housing: Case-Shiller Home Price Index (Index Jan 2000=100)": {
-        "id": "CSUSHPISA", "units": "Index (Jan 2000=100)", "frequency": "Monthly", "description": "S&P/Case-Shiller U.S. National Home Price Index", "notes": "Seasonally Adjusted", "category": "Housing"
+    "Consumer Sentiment: University of Michigan": {
+        "id": "UMCSENT", "units": "Index (1966:Q1=100)", "frequency": "Monthly", "description": "University of Michigan: Consumer Sentiment, Seasonally Adjusted", "category": "Consumer"
     },
     # Credit and Mortgage Metrics
     "Credit Card Delinquency Rate (%)": {
@@ -101,7 +99,7 @@ if 'data_source' not in st.session_state:
     st.session_state.data_source = 'fred'
 
 
-# --- Helper Functions ---
+# --- Helper Functions ---\
 def go_to_data_selection():
     """Resets state to return to the data selection screen."""
     st.session_state.screen = 'data_selection'
@@ -181,12 +179,6 @@ The overall relationship between the transformed series of '{dv_name}' and '{iv_
         analysis += "This is a common economic relationship, as rising unemployment puts financial pressure on households, often leading to an increase in loan defaults and charge-offs."
     elif "GDP" in iv_name and ("Delinquency" in dv_name or "Charge-Off" in dv_name):
         analysis += "Typically, as the economy grows (positive GDP growth), household financial health improves, leading to a decrease in loan defaults. The observed correlation aligns with this principle."
-    elif "Home Price" in iv_name or "HPI" in iv_name:
-        analysis += "Housing prices are a critical indicator of household wealth and collateral value. Rising home prices typically improve consumer financial health and reduce mortgage defaults."
-    elif "Disposable" in iv_name and "Income" in iv_name:
-        analysis += "Disposable income directly affects consumers' ability to service debt. Higher disposable income generally correlates with lower delinquency rates."
-    elif "Sentiment" in iv_name:
-        analysis += "Consumer sentiment reflects economic confidence and spending intentions. Higher sentiment often correlates with better credit performance as consumers feel more secure financially."
     else:
         analysis += "The interaction reflects how broader economic conditions influence consumer credit performance."
 
@@ -387,136 +379,93 @@ elif st.session_state.screen == 'analysis':
         download_df.to_excel(writer, sheet_name='Data', index=True)
     col6.download_button(label="Download as Excel", data=excel_buffer.getvalue(), file_name=f"macro_data_{datetime.date.today().strftime('%Y%m%d')}.xlsx", mime="application/vnd.openxmlformats-officedocument.sheetml.sheet", use_container_width=True)
 
-    # --- Bivariate Analysis Section ---
-    st.header("3. Bivariate Analysis")
-    st.subheader("Select Variables for Analysis")
-
-    all_columns = list(final_data.columns)
+    # --- Data Summary Table Section ---
+    st.header("3. Data Summary Table")
+    st.write("""
+    This table shows all available variables categorized into:
+    - **Predictor Variables**: Macro-economic indicators for loss forecasting models
+    - **Dependent Variables**: Credit card and mortgage delinquency and charge-off metrics
+    """)
+    
+    # Categorize variables
     credit_columns = [col for col in all_columns if 'delinquency' in col.lower() or 'charge-off' in col.lower()]
     macro_columns = [col for col in all_columns if col not in credit_columns]
-
-    if not credit_columns:
-        st.warning("No delinquency or charge-off variables found for dependent variable selection.")
-    elif not macro_columns:
-        st.warning("No macro-economic variables found for independent variable selection.")
-    else:
-        col_left, col_right = st.columns(2)
-        with col_left:
-            dependent_var_name = st.selectbox(
-                "Select Dependent Variable (Y-axis):",
-                options=credit_columns,
-                key="dv_select_main"
-            )
-        with col_right:
-            independent_vars_names = st.multiselect(
-                "Select Independent Variables (X-axis):",
-                options=macro_columns,
-                default=macro_columns[:1] if macro_columns else [],
-                key="iv_multi_select_main"
-            )
-
-        if not independent_vars_names:
-            st.warning("Please select at least one independent variable for analysis.")
+    
+    # Build summary data
+    summary_rows = []
+    
+    # Add predictor variables
+    for col in macro_columns:
+        col_data = final_data[col].dropna()
+        if not col_data.empty:
+            start_date = col_data.index.min().strftime('%Y-%m-%d')
+            end_date = col_data.index.max().strftime('%Y-%m-%d')
+            data_range = f"{start_date} to {end_date}"
+            observations = len(col_data)
         else:
-            if st.button("Run Bivariate Analysis", type="primary"):
-                all_analysis_content = []
-                with st.spinner("Running all analyses..."):
-                    for iv_name in independent_vars_names:
-                        try:
-                            pair_df = final_data[[dependent_var_name, iv_name]].dropna(how='any')
-                            if pair_df.empty or len(pair_df) < 8:
-                                st.warning(f"Not enough overlapping data for {iv_name}.")
-                                continue
-                            
-                            transformed_pair_df, stationarity_summary = check_stationarity_and_transform(pair_df, target_frequency)
-                            analysis_df = transformed_pair_df.dropna()
+            data_range = "No data"
+            observations = 0
+        
+        summary_rows.append({
+            "Variable Type": "Predictor Variable",
+            "Variable Name": col,
+            "Data Range": data_range,
+            "Observations": observations
+        })
+    
+    # Add dependent variables
+    for col in credit_columns:
+        col_data = final_data[col].dropna()
+        if not col_data.empty:
+            start_date = col_data.index.min().strftime('%Y-%m-%d')
+            end_date = col_data.index.max().strftime('%Y-%m-%d')
+            data_range = f"{start_date} to {end_date}"
+            observations = len(col_data)
+        else:
+            data_range = "No data"
+            observations = 0
+        
+        summary_rows.append({
+            "Variable Type": "Dependent Variable",
+            "Variable Name": col,
+            "Data Range": data_range,
+            "Observations": observations
+        })
+    
+    # Create and display summary dataframe
+    summary_df = pd.DataFrame(summary_rows)
+    
+    # Style the dataframe for better visualization
+    st.subheader("Variables Summary")
+    st.dataframe(
+        summary_df,
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    # Add summary statistics
+    st.subheader("Quick Statistics")
+    col_stat1, col_stat2, col_stat3 = st.columns(3)
+    col_stat1.metric("Total Predictor Variables", len(macro_columns))
+    col_stat2.metric("Total Dependent Variables", len(credit_columns))
+    col_stat3.metric("Total Variables", len(macro_columns) + len(credit_columns))
 
-                            if analysis_df.empty or len(analysis_df) < 8:
-                                st.warning(f"Not enough data after transformation for {iv_name}.")
-                                continue
-                            
-                            analysis_df_for_chart = analysis_df.reset_index()
-                            date_col_name = analysis_df_for_chart.columns[0]
-                            df_melted = analysis_df_for_chart.melt(id_vars=[date_col_name], var_name='Variable', value_name='Value')
-                            base = alt.Chart(df_melted).encode(x=alt.X(f'{date_col_name}:T', title='Date'))
-                            line1 = base.transform_filter(alt.datum.Variable == dependent_var_name).mark_line().encode(y=alt.Y('Value:Q', title=dependent_var_name, axis=alt.Axis(titleColor='#5276A7')), color=alt.value("#5276A7"))
-                            line2 = base.transform_filter(alt.datum.Variable == iv_name).mark_line(strokeDash=[5,5]).encode(y=alt.Y('Value:Q', title=iv_name, axis=alt.Axis(titleColor='#F1872B')), color=alt.value("#F1872B"))
-                            time_series_chart = alt.layer(line1, line2).resolve_scale(y='independent').properties(title=f"Time Series: {dependent_var_name} vs. {iv_name} (Transformed)", width=800, height=400).interactive()
-                            
-                            window_size = min(8, len(analysis_df) // 3) if len(analysis_df) // 3 > 0 else 1
-                            rolling_corr = analysis_df[dependent_var_name].rolling(window=window_size).corr(analysis_df[iv_name]).dropna()
-                            rolling_corr_chart_obj = None
-                            if not rolling_corr.empty and len(rolling_corr) > 1:
-                                rolling_corr_df = rolling_corr.reset_index(); rolling_corr_df.columns = ['Date', 'Correlation']
-                                rolling_corr_chart = alt.Chart(rolling_corr_df).mark_line(color='goldenrod').encode(x=alt.X('Date:T', title='Date'), y=alt.Y('Correlation:Q', title='Correlation', scale=alt.Scale(domain=[-1, 1]))).properties(title=f"{window_size}-Period Rolling Correlation", width=800, height=300)
-                                rolling_corr_text = f"The {window_size}-period rolling correlation ranges from {rolling_corr.min():.2f} to {rolling_corr.max():.2f}, with recent correlation of {rolling_corr.iloc[-1]:.2f}."
-                                rolling_corr_chart_obj = rolling_corr_chart
-                            else:
-                                rolling_corr_text = "Rolling correlation could not be computed due to insufficient data."
-
-                            correlation_val = analysis_df[dependent_var_name].corr(analysis_df[iv_name])
-                            stationarity_info_str = stationarity_summary[stationarity_summary['Variable'].isin([dependent_var_name, iv_name])].to_json(orient='records')
-                            analysis_text = get_basic_analysis(dependent_var_name, iv_name, correlation_val, rolling_corr_text, stationarity_info_str)
-                            
-                            all_analysis_content.append({"dv": dependent_var_name, "iv": iv_name, "ts_chart_obj": time_series_chart, "corr_chart_obj": rolling_corr_chart_obj, "analysis_text": analysis_text, "correlation": correlation_val, "stationarity_summary": stationarity_summary})
-                        except Exception as e:
-                            st.error(f"An error during analysis for {iv_name}: {e}")
-                            continue
-                    st.session_state['analysis_results'] = all_analysis_content
-                if st.session_state.get('analysis_results'):
-                    st.success("All analyses completed successfully!")
-
-    # --- Display Bivariate Analysis Results ---
-    if st.session_state.get('analysis_results'):
-        st.header("Bivariate Analysis Results")
-        for result in st.session_state.analysis_results:
-            st.markdown(f"### Analysis: `{result['dv']}` vs. `{result['iv']}`")
-            with st.expander("Stationarity Test and Transformation Details"):
-                st.dataframe(result['stationarity_summary'].set_index("Variable"))
-            st.altair_chart(result['ts_chart_obj'], use_container_width=True)
-            if result['corr_chart_obj']:
-                st.altair_chart(result['corr_chart_obj'], use_container_width=True)
-            st.markdown(result['analysis_text'])
-            st.markdown("---")
-
-
-    # --- Report Generation Section ---
-    if st.session_state.get('analysis_results'):
-        st.header("4. Generate Report")
-        if st.button("Generate Word Document", type="primary"):
-            with st.spinner("Creating Word document..."):
-                try:
-                    doc = Document()
-                    doc.add_heading('Bivariate Analysis Report', 0)
-                    doc.add_paragraph(f'Generated on: {datetime.date.today().strftime("%B %d, %Y")}')
-                    doc.add_paragraph('')
-                    for i, analysis in enumerate(st.session_state['analysis_results'], 1):
-                        doc.add_heading(f"{i}. Analysis: {analysis['dv']} vs. {analysis['iv']}", level=1)
-                        doc.add_paragraph(f"Overall Correlation: {analysis['correlation']:.4f}\n")
-                        ts_chart_img = save_chart(analysis['ts_chart_obj'])
-                        if ts_chart_img:
-                            doc.add_heading("Time Series Analysis", level=2)
-                            try: doc.add_picture(ts_chart_img, width=Inches(6.0))
-                            except: doc.add_paragraph("Chart could not be embedded.")
-                            doc.add_paragraph('')
-                        if analysis['corr_chart_obj']:
-                            corr_chart_img = save_chart(analysis['corr_chart_obj'])
-                            if corr_chart_img:
-                                doc.add_heading("Rolling Correlation Analysis", level=2)
-                                try: doc.add_picture(corr_chart_img, width=Inches(6.0))
-                                except: doc.add_paragraph("Chart could not be embedded.")
-                                doc.add_paragraph('')
-                        doc.add_heading("Economic Analysis", level=2)
-                        doc.add_paragraph(analysis['analysis_text'])
-                        if i < len(st.session_state['analysis_results']): doc.add_page_break()
-                    
-                    doc_io = io.BytesIO()
-                    doc.save(doc_io)
-                    doc_io.seek(0)
-                    st.download_button(label="Download Analysis Report", data=doc_io, file_name=f"Bivariate_Analysis_Report_{datetime.date.today().strftime('%Y%m%d')}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
-                    st.success("Report generated successfully!")
-                except Exception as e:
-                    st.error(f"Error generating report: {e}")
+    # --- Notes Section ---
+    st.header("4. Notes")
+    st.write("""
+    **About This Application:**
+    - This tool is designed for loss forecasting model development
+    - **Predictor Variables**: Use macro-economic indicators to forecast credit performance
+    - **Dependent Variables**: Credit card and mortgage delinquency/charge-off rates
+    - All data is sourced from FRED (Federal Reserve Economic Data)
+    - Data is processed to the selected frequency (Monthly or Quarterly)
+    
+    **Next Steps:**
+    - Download the data using the buttons above
+    - Import into your statistical software (Python, R, SAS, etc.)
+    - Build econometric models to forecast credit losses
+    - Consider lag structures and transformations as needed
+    """)
 
 # --- Footer ---
 st.markdown("---")
