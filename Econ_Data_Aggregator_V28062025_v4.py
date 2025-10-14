@@ -315,10 +315,10 @@ if st.session_state.screen == 'data_selection':
                                 
                                 target_freq_code = freq_map.get(target_frequency)
                                 if target_freq_code:
-                                    # FIX: Apply the period conversion and aggregation here, per series, to ensure a unique index before concatenation.
-                                    # 1. Convert to PeriodIndex (e.g., 2024-03-31 -> 2024Q1)
+                                    # FIX APPLIED HERE: Force unique, end-of-period TimestampIndex before concatenation
+                                    # 1. Convert to PeriodIndex (e.g., 2024-03-31 12:00:00 -> 2024Q1)
                                     converted_series.index = pd.to_datetime(converted_series.index).to_period(freq=target_freq_code)
-                                    # 2. Convert back to Timestamp (e.g., 2024Q1 -> 2024-03-31 23:59:59)
+                                    # 2. Convert back to a clean, non-ambiguous TimestampIndex (e.g., 2024Q1 -> 2024-03-31 23:59:59)
                                     converted_series = converted_series.to_timestamp(how='end')
                                 
                                 processed_series_list.append(converted_series)
@@ -326,7 +326,7 @@ if st.session_state.screen == 'data_selection':
                             st.toast("Data processed.")
                             
                             if processed_series_list:
-                                # FIX: The final concatenation now relies on the already-cleaned, unique TimestampIndex objects.
+                                # Final concatenation now works without unique index error
                                 final_data = pd.concat(processed_series_list, axis=1, join='outer').sort_index().dropna(how='all')
                                 
                                 # Rename columns for display
