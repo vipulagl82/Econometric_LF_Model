@@ -9,7 +9,7 @@ import altair as alt
 from statsmodels.tsa.stattools import adfuller
 from docx import Document
 from docx.shared import Inches
-import numpy as np 
+import numpy as np # Added for CSV processing
 
 # --- Streamlit App Configuration ---
 st.set_page_config(layout="wide", page_title="FRED Macro Data Downloader & Analyzer")
@@ -37,19 +37,8 @@ def get_fred_client(api_key):
 
 fred = get_fred_client(FRED_API_KEY)
 
-# --- Predefined Macro Series (UPDATED with new series) ---
+# --- Predefined Macro Series ---
 PREDEFINED_SERIES = {
-    # NEW SERIES ADDED
-    "HPI: S&P/Case-Shiller U.S. National Home Price Index": {
-        "id": "CSUSHPISA", "units": "Index (Jan 2000=100)", "frequency": "Monthly", "description": "S&P/Case-Shiller U.S. National Home Price Index", "notes": "Seasonally Adjusted", "category": "Housing"
-    },
-    "Real Disposable Personal Income (Billions of Chained 2017 Dollars)": {
-        "id": "DSPIC96", "units": "Billions of Chained 2017 Dollars", "frequency": "Quarterly", "description": "Real Disposable Personal Income", "notes": "Chained 2017 Dollars", "category": "Consumer"
-    },
-    "University of Michigan: Consumer Sentiment Index": {
-        "id": "UMCSENT", "units": "Index", "frequency": "Monthly", "description": "University of Michigan: Consumer Sentiment", "notes": "Not Seasonally Adjusted", "category": "Consumer"
-    },
-    # EXISTING SERIES
     # GDP
     "GDP: Nominal GDP (Billions of Dollars)": {
         "id": "GDP", "units": "Billions of Dollars", "frequency": "Quarterly", "description": "Gross Domestic Product", "notes": "Nominal", "category": "GDP"
@@ -72,6 +61,17 @@ PREDEFINED_SERIES = {
     # Consumer
     "Retail Sales: Total Retail Sales (Millions of Dollars)": {
         "id": "RSXFS", "units": "Millions of Dollars", "frequency": "Monthly", "description": "Retail and Food Services Sales, Seasonally Adjusted", "category": "Consumer"
+    },
+    "Consumer Sentiment: University of Michigan Index": {
+        "id": "UMCSENT", "units": "Index (1966:Q1=100)", "frequency": "Monthly", "description": "University of Michigan: Consumer Sentiment", "notes": "Seasonally Adjusted", "category": "Consumer"
+    },
+    # Income
+    "Real Disposable Personal Income (Billions of Chained 2017 Dollars)": {
+        "id": "DSPIC96", "units": "Billions of Chained 2017 Dollars", "frequency": "Monthly", "description": "Real Disposable Personal Income", "notes": "Seasonally Adjusted Annual Rate", "category": "Income"
+    },
+    # Housing
+    "Housing: Case-Shiller Home Price Index (Index Jan 2000=100)": {
+        "id": "CSUSHPISA", "units": "Index (Jan 2000=100)", "frequency": "Monthly", "description": "S&P/Case-Shiller U.S. National Home Price Index", "notes": "Seasonally Adjusted", "category": "Housing"
     },
     # Credit and Mortgage Metrics
     "Credit Card Delinquency Rate (%)": {
@@ -181,10 +181,12 @@ The overall relationship between the transformed series of '{dv_name}' and '{iv_
         analysis += "This is a common economic relationship, as rising unemployment puts financial pressure on households, often leading to an increase in loan defaults and charge-offs."
     elif "GDP" in iv_name and ("Delinquency" in dv_name or "Charge-Off" in dv_name):
         analysis += "Typically, as the economy grows (positive GDP growth), household financial health improves, leading to a decrease in loan defaults. The observed correlation aligns with this principle."
-    elif "HPI" in iv_name and ("Mortgage Delinquency" in dv_name or "Mortgage Charge-Off" in dv_name):
-        analysis += "The relationship between home prices (HPI) and mortgage delinquency is critical. Falling home prices erode homeowner equity, making default a more viable option (strategic default), while rising prices incentivize repayment. The observed correlation reflects this mechanism."
-    elif "Consumer Sentiment" in iv_name and ("Delinquency" in dv_name or "Charge-Off" in dv_name):
-        analysis += "Consumer sentiment acts as a leading indicator of household spending and saving behavior. Lower sentiment often precedes economic downturns, increasing the likelihood of financial distress and loan defaults."
+    elif "Home Price" in iv_name or "HPI" in iv_name:
+        analysis += "Housing prices are a critical indicator of household wealth and collateral value. Rising home prices typically improve consumer financial health and reduce mortgage defaults."
+    elif "Disposable" in iv_name and "Income" in iv_name:
+        analysis += "Disposable income directly affects consumers' ability to service debt. Higher disposable income generally correlates with lower delinquency rates."
+    elif "Sentiment" in iv_name:
+        analysis += "Consumer sentiment reflects economic confidence and spending intentions. Higher sentiment often correlates with better credit performance as consumers feel more secure financially."
     else:
         analysis += "The interaction reflects how broader economic conditions influence consumer credit performance."
 
@@ -312,24 +314,15 @@ if st.session_state.screen == 'data_selection':
                                 source_freq_str = id_to_info.get(series_id, {}).get("frequency")
                                 converted_series = convert_frequency(series_data, source_freq_str, target_frequency, agg_method, interp_method)
                                 if converted_series is None or converted_series.empty: continue
-                                
                                 target_freq_code = freq_map.get(target_frequency)
                                 if target_freq_code:
-                                    # FIX APPLIED HERE: Force unique, end-of-period TimestampIndex before concatenation
-                                    # 1. Convert to PeriodIndex (e.g., 2024-03-31 12:00:00 -> 2024Q1)
-                                    converted_series.index = pd.to_datetime(converted_series.index).to_period(freq=target_freq_code)
-                                    # 2. Convert back to a clean, non-ambiguous TimestampIndex (e.g., 2024Q1 -> 2024-03-31 23:59:59)
-                                    converted_series = converted_series.to_timestamp(how='end')
-                                
+                                    converted_series.index = pd.to_datetime(converted_series.index).to_period(freq=target_freq_code).to_timestamp(how='end')
                                 processed_series_list.append(converted_series)
                             
                             st.toast("Data processed.")
                             
                             if processed_series_list:
-                                # Final concatenation now works without unique index error
-                                final_data = pd.concat(processed_series_list, axis=1, join='outer').sort_index().dropna(how='all')
-                                
-                                # Rename columns for display
+                                final_data = pd.concat(processed_series_list, axis=1, join='outer').groupby(level=0).first().sort_index().dropna(how='all')
                                 id_to_display_name = {v['id']: k for k, v in PREDEFINED_SERIES.items()}
                                 final_data.rename(columns={col: id_to_display_name.get(col, col) for col in final_data.columns}, inplace=True)
                                 
@@ -338,7 +331,6 @@ if st.session_state.screen == 'data_selection':
                                 st.session_state.screen = 'analysis'
                                 st.session_state.analysis_results = None # Clear old results
                                 st.rerun()
-
                             else:
                                 st.warning("No data returned for the selected criteria. Please adjust your selections.")
 
