@@ -295,6 +295,11 @@ if st.session_state.screen == 'data_selection':
 
                             if isinstance(raw_data, pd.Series):
                                 raw_data = raw_data.to_frame(name=selected_fred_ids[0])
+                            
+                            # Remove any duplicate indices in raw data
+                            if raw_data.index.duplicated().any():
+                                raw_data = raw_data.groupby(level=0).first()
+                            
                             st.toast("Raw data fetched!")
 
                             id_to_info = {info["id"]: info for info in PREDEFINED_SERIES.values()}
@@ -309,6 +314,9 @@ if st.session_state.screen == 'data_selection':
                                 target_freq_code = freq_map.get(target_frequency)
                                 if target_freq_code:
                                     converted_series.index = pd.to_datetime(converted_series.index).to_period(freq=target_freq_code).to_timestamp(how='end')
+                                # Remove any duplicate indices that may have been created
+                                if converted_series.index.duplicated().any():
+                                    converted_series = converted_series.groupby(level=0).first()
                                 processed_series_list.append(converted_series)
                             
                             st.toast("Data processed.")
