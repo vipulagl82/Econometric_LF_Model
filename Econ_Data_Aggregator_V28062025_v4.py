@@ -9,7 +9,7 @@ import altair as alt
 from statsmodels.tsa.stattools import adfuller
 from docx import Document
 from docx.shared import Inches
-import numpy as np # Added for CSV processing
+import numpy as np 
 
 # --- Streamlit App Configuration ---
 st.set_page_config(layout="wide", page_title="FRED Macro Data Downloader & Analyzer")
@@ -37,7 +37,7 @@ def get_fred_client(api_key):
 
 fred = get_fred_client(FRED_API_KEY)
 
-# --- Predefined Macro Series ---
+# --- Predefined Macro Series (UPDATED with new series) ---
 PREDEFINED_SERIES = {
     # NEW SERIES ADDED
     "HPI: S&P/Case-Shiller U.S. National Home Price Index": {
@@ -312,15 +312,24 @@ if st.session_state.screen == 'data_selection':
                                 source_freq_str = id_to_info.get(series_id, {}).get("frequency")
                                 converted_series = convert_frequency(series_data, source_freq_str, target_frequency, agg_method, interp_method)
                                 if converted_series is None or converted_series.empty: continue
+                                
                                 target_freq_code = freq_map.get(target_frequency)
                                 if target_freq_code:
-                                    converted_series.index = pd.to_datetime(converted_series.index).to_period(freq=target_freq_code).to_timestamp(how='end')
+                                    # FIX: Apply the period conversion and aggregation here, per series, to ensure a unique index before concatenation.
+                                    # 1. Convert to PeriodIndex (e.g., 2024-03-31 -> 2024Q1)
+                                    converted_series.index = pd.to_datetime(converted_series.index).to_period(freq=target_freq_code)
+                                    # 2. Convert back to Timestamp (e.g., 2024Q1 -> 2024-03-31 23:59:59)
+                                    converted_series = converted_series.to_timestamp(how='end')
+                                
                                 processed_series_list.append(converted_series)
                             
                             st.toast("Data processed.")
                             
                             if processed_series_list:
-                                final_data = pd.concat(processed_series_list, axis=1, join='outer').groupby(level=0).first().sort_index().dropna(how='all')
+                                # FIX: The final concatenation now relies on the already-cleaned, unique TimestampIndex objects.
+                                final_data = pd.concat(processed_series_list, axis=1, join='outer').sort_index().dropna(how='all')
+                                
+                                # Rename columns for display
                                 id_to_display_name = {v['id']: k for k, v in PREDEFINED_SERIES.items()}
                                 final_data.rename(columns={col: id_to_display_name.get(col, col) for col in final_data.columns}, inplace=True)
                                 
@@ -329,6 +338,7 @@ if st.session_state.screen == 'data_selection':
                                 st.session_state.screen = 'analysis'
                                 st.session_state.analysis_results = None # Clear old results
                                 st.rerun()
+
                             else:
                                 st.warning("No data returned for the selected criteria. Please adjust your selections.")
 
