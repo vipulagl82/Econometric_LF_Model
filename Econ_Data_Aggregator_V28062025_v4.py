@@ -4,7 +4,6 @@ import pandas_datareader.data as web
 import datetime
 from fredapi import Fred
 import io
-import os
 import collections
 import altair as alt
 from statsmodels.tsa.stattools import adfuller
@@ -12,7 +11,7 @@ from docx import Document
 from docx.shared import Inches
 import numpy as np # Added for CSV processing
 
-# --- Streamlit App Configuration ---\
+# --- Streamlit App Configuration ---
 st.set_page_config(layout="wide", page_title="FRED Macro Data Downloader & Analyzer")
 
 st.title("Enhanced FRED Macro Data Downloader & Analyzer")
@@ -22,16 +21,9 @@ This application allows you to download, process, and analyze macroeconomic data
 """)
 
 # --- FRED API Key Setup ---
-# Retrieve the secret and assign it
-try:
-    FRED_API_KEY = st.secrets["FRED_API_KEY"]
-    os.environ['FRED_API_KEY'] = FRED_API_KEY
-except KeyError:
-    FRED_API_KEY = None
-
-# Check if the key is valid
+FRED_API_KEY = "1bef8a463132e1f36f04a5fd56a92cc0"
 if not FRED_API_KEY:
-    st.error("FRED API Key is missing. Please add 'FRED_API_KEY' to your secrets.")
+    st.error("FRED API Key is missing. Please provide a valid key to proceed.")
     st.stop()
 
 # --- FRED Client Initialization ---
@@ -47,6 +39,17 @@ fred = get_fred_client(FRED_API_KEY)
 
 # --- Predefined Macro Series ---
 PREDEFINED_SERIES = {
+    # NEW SERIES ADDED
+    "HPI: S&P/Case-Shiller U.S. National Home Price Index": {
+        "id": "CSUSHPISA", "units": "Index (Jan 2000=100)", "frequency": "Monthly", "description": "S&P/Case-Shiller U.S. National Home Price Index", "notes": "Seasonally Adjusted", "category": "Housing"
+    },
+    "Real Disposable Personal Income (Billions of Chained 2017 Dollars)": {
+        "id": "DSPIC96", "units": "Billions of Chained 2017 Dollars", "frequency": "Quarterly", "description": "Real Disposable Personal Income", "notes": "Chained 2017 Dollars", "category": "Consumer"
+    },
+    "University of Michigan: Consumer Sentiment Index": {
+        "id": "UMCSENT", "units": "Index", "frequency": "Monthly", "description": "University of Michigan: Consumer Sentiment", "notes": "Not Seasonally Adjusted", "category": "Consumer"
+    },
+    # EXISTING SERIES
     # GDP
     "GDP: Nominal GDP (Billions of Dollars)": {
         "id": "GDP", "units": "Billions of Dollars", "frequency": "Quarterly", "description": "Gross Domestic Product", "notes": "Nominal", "category": "GDP"
@@ -98,7 +101,7 @@ if 'data_source' not in st.session_state:
     st.session_state.data_source = 'fred'
 
 
-# --- Helper Functions ---\
+# --- Helper Functions ---
 def go_to_data_selection():
     """Resets state to return to the data selection screen."""
     st.session_state.screen = 'data_selection'
@@ -178,6 +181,10 @@ The overall relationship between the transformed series of '{dv_name}' and '{iv_
         analysis += "This is a common economic relationship, as rising unemployment puts financial pressure on households, often leading to an increase in loan defaults and charge-offs."
     elif "GDP" in iv_name and ("Delinquency" in dv_name or "Charge-Off" in dv_name):
         analysis += "Typically, as the economy grows (positive GDP growth), household financial health improves, leading to a decrease in loan defaults. The observed correlation aligns with this principle."
+    elif "HPI" in iv_name and ("Mortgage Delinquency" in dv_name or "Mortgage Charge-Off" in dv_name):
+        analysis += "The relationship between home prices (HPI) and mortgage delinquency is critical. Falling home prices erode homeowner equity, making default a more viable option (strategic default), while rising prices incentivize repayment. The observed correlation reflects this mechanism."
+    elif "Consumer Sentiment" in iv_name and ("Delinquency" in dv_name or "Charge-Off" in dv_name):
+        analysis += "Consumer sentiment acts as a leading indicator of household spending and saving behavior. Lower sentiment often precedes economic downturns, increasing the likelihood of financial distress and loan defaults."
     else:
         analysis += "The interaction reflects how broader economic conditions influence consumer credit performance."
 
