@@ -1118,165 +1118,165 @@ elif st.session_state.screen == 'analysis':
                     if st.button("🔄 Macro Transformations", type="primary", key="macro_transform_btn"):
                         with st.spinner("Performing macro transformations..."):
                             try:
-                            # Step 1: Clean variable names
-                            cleaned_names = clean_variable_names(transform_data)
-                            transform_data_cleaned = transform_data.rename(columns=cleaned_names)
-                            
-                            # Step 2: Create aliases
-                            aliases = create_variable_aliases()
-                            
-                            # Step 3: Map time varying variables to cleaned names
-                            cleaned_time_varying_vars = []
-                            for var in time_varying_variables:
-                                if var in cleaned_names:
-                                    cleaned_time_varying_vars.append(cleaned_names[var])
-                                else:
-                                    cleaned_time_varying_vars.append(var)
-                            
-                            # Step 4: Create macro transformations for time varying variables only
-                            transformed_data = create_macro_transformations(transform_data_cleaned, cleaned_time_varying_vars, aliases)
-                            
-                            # Step 4: Test stationarity
-                            all_vars = list(transformed_data.columns)
-                            stationarity_results = test_stationarity(transformed_data, all_vars)
-                            
-                            # Step 5: Create final data with all variables
-                            # Include all original variables (dependent, anchor, time varying) plus stationary transformations
-                            stationary_vars = stationarity_results[stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
-                            
-                            # Start with original data and add stationary transformations
-                            final_transformed_data = transform_data_cleaned.copy()
-                            
-                            # Add stationary transformations with proper index alignment
-                            for var in stationary_vars:
-                                if var in transformed_data.columns:
-                                    # Use intersection of indices to avoid index mismatch
-                                    common_index = final_transformed_data.index.intersection(transformed_data.index)
-                                    if len(common_index) > 0:
-                                        final_transformed_data.loc[common_index, var] = transformed_data.loc[common_index, var]
-                            
-                            # Remove rows where any variable is missing
-                            final_transformed_data = final_transformed_data.dropna()
-                            
-                            # Rename original variables to use aliases
-                            rename_dict = {}
-                            for original_name, alias in aliases.items():
-                                if original_name in final_transformed_data.columns:
-                                    rename_dict[original_name] = alias
-                            
-                            if rename_dict:
-                                final_transformed_data = final_transformed_data.rename(columns=rename_dict)
-                            
-                            # Ensure index is properly formatted as datetime for panel data creation
-                            if not hasattr(final_transformed_data.index, 'year'):
-                                # If index is not datetime-like, convert it
-                                try:
-                                    final_transformed_data.index = pd.to_datetime(final_transformed_data.index)
-                                except:
-                                    # If conversion fails, keep original index
-                                    pass
-                            
-                            # Store results in session state
-                            st.session_state.transformed_data = final_transformed_data
-                            st.session_state.stationarity_results = stationarity_results
-                            st.session_state.aliases = aliases
-                            st.session_state.alias_metadata = create_alias_metadata()
-                            st.session_state.cleaned_names = cleaned_names
-                            st.session_state.transform_data = transform_data  # Store original data for panel creation
-                            
-                            st.success(f"Macro transformations completed! {len(stationary_vars)} stationary variables retained.")
-                            
-                            # Display results
-                            st.subheader("Transformation Results")
-                            
-                            col_results1, col_results2 = st.columns(2)
-                            
-                            with col_results1:
-                                st.metric("Original Variables", len(transform_data.columns))
-                                st.metric("Transformed Variables", len(transformed_data.columns))
-                                st.metric("Stationary Variables", len(stationary_vars))
-                                st.metric("Final Observations", len(final_transformed_data))
-                            
-                            with col_results2:
-                                st.metric("Variables Dropped", len(transformed_data.columns) - len(stationary_vars))
-                                st.metric("Missing Records Dropped", len(transformed_data) - len(final_transformed_data))
-                            
-                            # Display stationarity results
-                            st.subheader("Stationarity Test Results")
-                            st.dataframe(stationarity_results, use_container_width=True, hide_index=True)
-                            
-                            # Display alias metadata
-                            st.subheader("Variable Alias Reference")
-                            alias_metadata = st.session_state.alias_metadata
-                            
-                            # Create a DataFrame for better display
-                            alias_df = pd.DataFrame([
-                                {
-                                    'Alias': alias,
-                                    'Full Name': metadata['full_name'],
-                                    'Category': metadata['category'],
-                                    'Description': metadata['description']
-                                }
-                                for alias, metadata in alias_metadata.items()
-                            ])
-                            
-                            st.dataframe(alias_df, use_container_width=True, hide_index=True)
-                            
-                            # Download alias metadata
-                            alias_csv_buffer = io.StringIO()
-                            alias_df.to_csv(alias_csv_buffer, index=False)
-                            st.download_button(
-                                label="Download Alias Reference (CSV)",
-                                data=alias_csv_buffer.getvalue(),
-                                file_name="variable_aliases_reference.csv",
-                                mime="text/csv"
-                            )
-                            
-                            # Download options
-                            st.subheader("Download Transformation Results")
-                            
-                            col_download1, col_download2, col_download3 = st.columns(3)
-                            
-                            # Download transformed data
-                            with col_download1:
-                                transform_csv_buffer = io.StringIO()
-                                final_transformed_data.to_csv(transform_csv_buffer)
+                                # Step 1: Clean variable names
+                                cleaned_names = clean_variable_names(transform_data)
+                                transform_data_cleaned = transform_data.rename(columns=cleaned_names)
+                                
+                                # Step 2: Create aliases
+                                aliases = create_variable_aliases()
+                                
+                                # Step 3: Map time varying variables to cleaned names
+                                cleaned_time_varying_vars = []
+                                for var in time_varying_variables:
+                                    if var in cleaned_names:
+                                        cleaned_time_varying_vars.append(cleaned_names[var])
+                                    else:
+                                        cleaned_time_varying_vars.append(var)
+                                
+                                # Step 4: Create macro transformations for time varying variables only
+                                transformed_data = create_macro_transformations(transform_data_cleaned, cleaned_time_varying_vars, aliases)
+                                
+                                # Step 4: Test stationarity
+                                all_vars = list(transformed_data.columns)
+                                stationarity_results = test_stationarity(transformed_data, all_vars)
+                                
+                                # Step 5: Create final data with all variables
+                                # Include all original variables (dependent, anchor, time varying) plus stationary transformations
+                                stationary_vars = stationarity_results[stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
+                                
+                                # Start with original data and add stationary transformations
+                                final_transformed_data = transform_data_cleaned.copy()
+                                
+                                # Add stationary transformations with proper index alignment
+                                for var in stationary_vars:
+                                    if var in transformed_data.columns:
+                                        # Use intersection of indices to avoid index mismatch
+                                        common_index = final_transformed_data.index.intersection(transformed_data.index)
+                                        if len(common_index) > 0:
+                                            final_transformed_data.loc[common_index, var] = transformed_data.loc[common_index, var]
+                                
+                                # Remove rows where any variable is missing
+                                final_transformed_data = final_transformed_data.dropna()
+                                
+                                # Rename original variables to use aliases
+                                rename_dict = {}
+                                for original_name, alias in aliases.items():
+                                    if original_name in final_transformed_data.columns:
+                                        rename_dict[original_name] = alias
+                                
+                                if rename_dict:
+                                    final_transformed_data = final_transformed_data.rename(columns=rename_dict)
+                                
+                                # Ensure index is properly formatted as datetime for panel data creation
+                                if not hasattr(final_transformed_data.index, 'year'):
+                                    # If index is not datetime-like, convert it
+                                    try:
+                                        final_transformed_data.index = pd.to_datetime(final_transformed_data.index)
+                                    except:
+                                        # If conversion fails, keep original index
+                                        pass
+                                
+                                # Store results in session state
+                                st.session_state.transformed_data = final_transformed_data
+                                st.session_state.stationarity_results = stationarity_results
+                                st.session_state.aliases = aliases
+                                st.session_state.alias_metadata = create_alias_metadata()
+                                st.session_state.cleaned_names = cleaned_names
+                                st.session_state.transform_data = transform_data  # Store original data for panel creation
+                                
+                                st.success(f"Macro transformations completed! {len(stationary_vars)} stationary variables retained.")
+                                
+                                # Display results
+                                st.subheader("Transformation Results")
+                                
+                                col_results1, col_results2 = st.columns(2)
+                                
+                                with col_results1:
+                                    st.metric("Original Variables", len(transform_data.columns))
+                                    st.metric("Transformed Variables", len(transformed_data.columns))
+                                    st.metric("Stationary Variables", len(stationary_vars))
+                                    st.metric("Final Observations", len(final_transformed_data))
+                                
+                                with col_results2:
+                                    st.metric("Variables Dropped", len(transformed_data.columns) - len(stationary_vars))
+                                    st.metric("Missing Records Dropped", len(transformed_data) - len(final_transformed_data))
+                                
+                                # Display stationarity results
+                                st.subheader("Stationarity Test Results")
+                                st.dataframe(stationarity_results, use_container_width=True, hide_index=True)
+                                
+                                # Display alias metadata
+                                st.subheader("Variable Alias Reference")
+                                alias_metadata = st.session_state.alias_metadata
+                                
+                                # Create a DataFrame for better display
+                                alias_df = pd.DataFrame([
+                                    {
+                                        'Alias': alias,
+                                        'Full Name': metadata['full_name'],
+                                        'Category': metadata['category'],
+                                        'Description': metadata['description']
+                                    }
+                                    for alias, metadata in alias_metadata.items()
+                                ])
+                                
+                                st.dataframe(alias_df, use_container_width=True, hide_index=True)
+                                
+                                # Download alias metadata
+                                alias_csv_buffer = io.StringIO()
+                                alias_df.to_csv(alias_csv_buffer, index=False)
                                 st.download_button(
-                                    label="Download Transformed Data (CSV)",
-                                    data=transform_csv_buffer.getvalue(),
-                                    file_name=f"transformed_data_{datetime.date.today().strftime('%Y%m%d')}.csv",
-                                    mime="text/csv",
-                                    use_container_width=True
+                                    label="Download Alias Reference (CSV)",
+                                    data=alias_csv_buffer.getvalue(),
+                                    file_name="variable_aliases_reference.csv",
+                                    mime="text/csv"
                                 )
-                            
-                            # Download stationarity results
-                            with col_download2:
-                                stationarity_csv_buffer = io.StringIO()
-                                stationarity_results.to_csv(stationarity_csv_buffer, index=False)
-                                st.download_button(
-                                    label="Download Stationarity Results (CSV)",
-                                    data=stationarity_csv_buffer.getvalue(),
-                                    file_name=f"stationarity_results_{datetime.date.today().strftime('%Y%m%d')}.csv",
-                                    mime="text/csv",
-                                    use_container_width=True
-                                )
-                            
-                            # Download Excel with multiple sheets
-                            with col_download3:
-                                excel_buffer = io.BytesIO()
-                                with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
-                                    final_transformed_data.to_excel(writer, sheet_name='Transformed_Data', index=True)
-                                    stationarity_results.to_excel(writer, sheet_name='Stationarity_Results', index=False)
-                                st.download_button(
-                                    label="Download All Results (Excel)",
-                                    data=excel_buffer.getvalue(),
-                                    file_name=f"transformation_results_{datetime.date.today().strftime('%Y%m%d')}.xlsx",
-                                    mime="application/vnd.openxmlformats-officedocument.sheetml.sheet",
-                                    use_container_width=True
-                                )
-                            
-                        except Exception as e:
-                            st.error(f"Error during macro transformations: {e}")
+                                
+                                # Download options
+                                st.subheader("Download Transformation Results")
+                                
+                                col_download1, col_download2, col_download3 = st.columns(3)
+                                
+                                # Download transformed data
+                                with col_download1:
+                                    transform_csv_buffer = io.StringIO()
+                                    final_transformed_data.to_csv(transform_csv_buffer)
+                                    st.download_button(
+                                        label="Download Transformed Data (CSV)",
+                                        data=transform_csv_buffer.getvalue(),
+                                        file_name=f"transformed_data_{datetime.date.today().strftime('%Y%m%d')}.csv",
+                                        mime="text/csv",
+                                        use_container_width=True
+                                    )
+                                
+                                # Download stationarity results
+                                with col_download2:
+                                    stationarity_csv_buffer = io.StringIO()
+                                    stationarity_results.to_csv(stationarity_csv_buffer, index=False)
+                                    st.download_button(
+                                        label="Download Stationarity Results (CSV)",
+                                        data=stationarity_csv_buffer.getvalue(),
+                                        file_name=f"stationarity_results_{datetime.date.today().strftime('%Y%m%d')}.csv",
+                                        mime="text/csv",
+                                        use_container_width=True
+                                    )
+                                
+                                # Download Excel with multiple sheets
+                                with col_download3:
+                                    excel_buffer = io.BytesIO()
+                                    with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+                                        final_transformed_data.to_excel(writer, sheet_name='Transformed_Data', index=True)
+                                        stationarity_results.to_excel(writer, sheet_name='Stationarity_Results', index=False)
+                                    st.download_button(
+                                        label="Download All Results (Excel)",
+                                        data=excel_buffer.getvalue(),
+                                        file_name=f"transformation_results_{datetime.date.today().strftime('%Y%m%d')}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.sheetml.sheet",
+                                        use_container_width=True
+                                    )
+                                
+                            except Exception as e:
+                                st.error(f"Error during macro transformations: {e}")
             
             with col_trans2:
                 if st.button("📊 Panel Data Creation", type="primary", key="panel_data_btn"):
