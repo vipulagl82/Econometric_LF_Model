@@ -1076,7 +1076,7 @@ elif st.session_state.screen == 'analysis':
                         key="dependent_var_select_all",
                         help="Target variable for the loss forecasting model"
                     )
-        
+            
             with col_anchor:
                 st.write("**Anchor Variable Selection**")
                 if credit_columns:
@@ -1136,11 +1136,11 @@ elif st.session_state.screen == 'analysis':
                                 # Step 4: Create macro transformations for time varying variables only
                                 transformed_data = create_macro_transformations(transform_data_cleaned, cleaned_time_varying_vars, aliases)
                                 
-                                # Step 4: Test stationarity
+                                # Step 5: Test stationarity
                                 all_vars = list(transformed_data.columns)
                                 stationarity_results = test_stationarity(transformed_data, all_vars)
                                 
-                                # Step 5: Create final data with all variables
+                                # Step 6: Create final data with all variables
                                 # Include all original variables (dependent, anchor, time varying) plus stationary transformations
                                 stationary_vars = stationarity_results[stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
                                 
@@ -1277,200 +1277,200 @@ elif st.session_state.screen == 'analysis':
                                 
                             except Exception as e:
                                 st.error(f"Error during macro transformations: {e}")
-            
-            with col_trans2:
-                if st.button("📊 Panel Data Creation", type="primary", key="panel_data_btn"):
-                    if 'transformed_data' in st.session_state:
-                        with st.spinner("Creating panel data..."):
-                            try:
-                                # Get cleaned names from session state
-                                cleaned_names = st.session_state.get('cleaned_names', {})
-                                
-                                # Use the selected variables from the variable selection
-                                st.subheader("Panel Data Configuration")
-                                
-                                # Get aliases from session state
-                                aliases = st.session_state.get('aliases', {})
-                                
-                                # Use the final transformed data directly (includes all variables)
-                                panel_data_source = st.session_state.transformed_data.copy()
-                                
-                                # Map anchor variable to alias
-                                cleaned_anchor_var = None
-                                # Check if the selected variable is already an alias
-                                if anchor_variable in panel_data_source.columns:
-                                    cleaned_anchor_var = anchor_variable
-                                elif anchor_variable in aliases:
-                                    cleaned_anchor_var = aliases[anchor_variable]
-                                elif anchor_variable in cleaned_names:
-                                    cleaned_anchor_var = cleaned_names[anchor_variable]
-                                else:
-                                    cleaned_anchor_var = anchor_variable
-                                
-                                # Map dependent variable to alias
-                                cleaned_dependent_var = None
-                                # Check if the selected variable is already an alias
-                                if dependent_variable in panel_data_source.columns:
-                                    cleaned_dependent_var = dependent_variable
-                                elif dependent_variable in aliases:
-                                    cleaned_dependent_var = aliases[dependent_variable]
-                                elif dependent_variable in cleaned_names:
-                                    cleaned_dependent_var = cleaned_names[dependent_variable]
-                                else:
-                                    cleaned_dependent_var = dependent_variable
-                                
-                                # Get all stationary variables (excluding anchor and dependent variables)
-                                stationary_vars = st.session_state.stationarity_results[st.session_state.stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
-                                macro_transformations = [var for var in stationary_vars if var not in [cleaned_anchor_var, cleaned_dependent_var]]
-                                
-                                st.info(f"Using {len(macro_transformations)} stationary macro transformations for panel data.")
-                                
-                                # Validate data before panel creation
-                                st.write("**Data Validation:**")
-                                st.write(f"- Panel data source shape: {panel_data_source.shape}")
-                                st.write(f"- Index type: {type(panel_data_source.index)}")
-                                st.write(f"- Anchor variable: {cleaned_anchor_var}")
-                                st.write(f"- Dependent variable: {cleaned_dependent_var}")
-                                st.write(f"- Macro transformations: {len(macro_transformations)}")
-                                
-                                # Check if all required variables exist
-                                missing_vars = []
-                                if cleaned_anchor_var not in panel_data_source.columns:
-                                    missing_vars.append(cleaned_anchor_var)
-                                if cleaned_dependent_var not in panel_data_source.columns:
-                                    missing_vars.append(cleaned_dependent_var)
-                                
-                                for var in macro_transformations:
-                                    if var not in panel_data_source.columns:
-                                        missing_vars.append(var)
-                                
-                                if missing_vars:
-                                    st.error(f"Missing variables in panel data source: {missing_vars}")
-                                    st.stop()
-                                
-                                # Create panel data
-                                panel_data = create_panel_data(
-                                    panel_data_source,
-                                    cleaned_anchor_var,
-                                    cleaned_dependent_var,
-                                    macro_transformations,
-                                    performance_quarters=13
-                                )
-                                
-                                # Merge dependent variable by calendar quarter
+                
+                with col_trans2:
+                    if st.button("📊 Panel Data Creation", type="primary", key="panel_data_btn"):
+                        if 'transformed_data' in st.session_state:
+                            with st.spinner("Creating panel data..."):
                                 try:
-                                    # Create dependent variable data with proper calendar quarter formatting
-                                    dependent_data = panel_data_source[[cleaned_dependent_var]].copy()
+                                    # Get cleaned names from session state
+                                    cleaned_names = st.session_state.get('cleaned_names', {})
                                     
-                                    # Create calendar quarter directly from the index
-                                    dependent_data['Calendar_Qtr'] = dependent_data.index.to_series().apply(
-                                        lambda x: f"{x.year}Q{(x.month - 1) // 3 + 1}"
+                                    # Use the selected variables from the variable selection
+                                    st.subheader("Panel Data Configuration")
+                                    
+                                    # Get aliases from session state
+                                    aliases = st.session_state.get('aliases', {})
+                                    
+                                    # Use the final transformed data directly (includes all variables)
+                                    panel_data_source = st.session_state.transformed_data.copy()
+                                    
+                                    # Map anchor variable to alias
+                                    cleaned_anchor_var = None
+                                    # Check if the selected variable is already an alias
+                                    if anchor_variable in panel_data_source.columns:
+                                        cleaned_anchor_var = anchor_variable
+                                    elif anchor_variable in aliases:
+                                        cleaned_anchor_var = aliases[anchor_variable]
+                                    elif anchor_variable in cleaned_names:
+                                        cleaned_anchor_var = cleaned_names[anchor_variable]
+                                    else:
+                                        cleaned_anchor_var = anchor_variable
+                                    
+                                    # Map dependent variable to alias
+                                    cleaned_dependent_var = None
+                                    # Check if the selected variable is already an alias
+                                    if dependent_variable in panel_data_source.columns:
+                                        cleaned_dependent_var = dependent_variable
+                                    elif dependent_variable in aliases:
+                                        cleaned_dependent_var = aliases[dependent_variable]
+                                    elif dependent_variable in cleaned_names:
+                                        cleaned_dependent_var = cleaned_names[dependent_variable]
+                                    else:
+                                        cleaned_dependent_var = dependent_variable
+                                    
+                                    # Get all stationary variables (excluding anchor and dependent variables)
+                                    stationary_vars = st.session_state.stationarity_results[st.session_state.stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
+                                    macro_transformations = [var for var in stationary_vars if var not in [cleaned_anchor_var, cleaned_dependent_var]]
+                                    
+                                    st.info(f"Using {len(macro_transformations)} stationary macro transformations for panel data.")
+                                    
+                                    # Validate data before panel creation
+                                    st.write("**Data Validation:**")
+                                    st.write(f"- Panel data source shape: {panel_data_source.shape}")
+                                    st.write(f"- Index type: {type(panel_data_source.index)}")
+                                    st.write(f"- Anchor variable: {cleaned_anchor_var}")
+                                    st.write(f"- Dependent variable: {cleaned_dependent_var}")
+                                    st.write(f"- Macro transformations: {len(macro_transformations)}")
+                                    
+                                    # Check if all required variables exist
+                                    missing_vars = []
+                                    if cleaned_anchor_var not in panel_data_source.columns:
+                                        missing_vars.append(cleaned_anchor_var)
+                                    if cleaned_dependent_var not in panel_data_source.columns:
+                                        missing_vars.append(cleaned_dependent_var)
+                                    
+                                    for var in macro_transformations:
+                                        if var not in panel_data_source.columns:
+                                            missing_vars.append(var)
+                                    
+                                    if missing_vars:
+                                        st.error(f"Missing variables in panel data source: {missing_vars}")
+                                        st.stop()
+                                    
+                                    # Create panel data
+                                    panel_data = create_panel_data(
+                                        panel_data_source,
+                                        cleaned_anchor_var,
+                                        cleaned_dependent_var,
+                                        macro_transformations,
+                                        performance_quarters=13
                                     )
                                     
-                                    # Rename the dependent variable column
-                                    dependent_data = dependent_data.rename(columns={cleaned_dependent_var: 'Dependent_Variable'})
+                                    # Merge dependent variable by calendar quarter
+                                    try:
+                                        # Create dependent variable data with proper calendar quarter formatting
+                                        dependent_data = panel_data_source[[cleaned_dependent_var]].copy()
+                                        
+                                        # Create calendar quarter directly from the index
+                                        dependent_data['Calendar_Qtr'] = dependent_data.index.to_series().apply(
+                                            lambda x: f"{x.year}Q{(x.month - 1) // 3 + 1}"
+                                        )
+                                        
+                                        # Rename the dependent variable column
+                                        dependent_data = dependent_data.rename(columns={cleaned_dependent_var: 'Dependent_Variable'})
+                                        
+                                        # Reset index to make it a regular DataFrame
+                                        dependent_data = dependent_data.reset_index(drop=True)
+                                        
+                                    except Exception as e:
+                                        st.error(f"Error creating dependent variable data: {e}")
+                                        st.write(f"Debug info - panel_data_source index type: {type(panel_data_source.index)}")
+                                        st.write(f"Debug info - panel_data_source columns: {list(panel_data_source.columns)}")
+                                        st.stop()
                                     
-                                    # Reset index to make it a regular DataFrame
-                                    dependent_data = dependent_data.reset_index(drop=True)
+                                    # Merge dependent variable to panel data
+                                    panel_data = panel_data.merge(
+                                        dependent_data[['Calendar_Qtr', 'Dependent_Variable']], 
+                                        on='Calendar_Qtr', 
+                                        how='left'
+                                    )
                                     
+                                    # Calculate average dependent variable by performance quarter
+                                    avg_dependent_by_perf = panel_data.groupby('Performance_Quarter')['Dependent_Variable'].mean().reset_index()
+                                    avg_dependent_by_perf = avg_dependent_by_perf.rename(columns={'Dependent_Variable': 'Avg_Dependent_By_Perf'})
+                                    
+                                    # Merge average dependent variable back to panel data
+                                    panel_data = panel_data.merge(avg_dependent_by_perf, on='Performance_Quarter', how='left')
+                                    
+                                    # Store in session state
+                                    st.session_state.panel_data = panel_data
+                                    
+                                    st.success(f"Panel data created successfully! {len(panel_data)} observations.")
+                                    
+                                    # Display panel data summary
+                                    st.subheader("Panel Data Summary")
+                                    
+                                    col_panel1, col_panel2, col_panel3 = st.columns(3)
+                                    
+                                    with col_panel1:
+                                        st.metric("Total Observations", len(panel_data))
+                                        st.metric("Unique Snapshots", panel_data['Snapshot_Date'].nunique())
+                                        st.metric("Anchor Variable", cleaned_anchor_var)
+                                    
+                                    with col_panel2:
+                                        st.metric("Performance Quarters", panel_data['Performance_Quarter'].max())
+                                        st.metric("Macro Variables", len(macro_transformations))
+                                        st.metric("Dependent Variable", cleaned_dependent_var)
+                                    
+                                    with col_panel3:
+                                        st.metric("Date Range", f"{panel_data['Snapshot_Date'].min()} to {panel_data['Snapshot_Date'].max()}")
+                                        st.metric("Total Variables", len(panel_data.columns))
+                                    
+                                    # Display panel data structure
+                                    st.subheader("Panel Data Structure")
+                                    st.write("""
+                                    **Panel Data Components:**
+                                    - **Snapshot Variables**: Anchor variable at time T (constant across performance quarters)
+                                    - **Performance Variables**: Macro transformations aligned to calendar quarter (T+k)
+                                    - **Dependent Variable**: Merged by calendar quarter
+                                    - **Average Dependent**: Average dependent variable by performance quarter
+                                    """)
+                                    
+                                    # Display sample of panel data
+                                    st.subheader("Panel Data Preview")
+                                    display_columns = ['Snapshot_Date', 'Performance_Quarter', 'Calendar_Qtr', f'Snapshot_{cleaned_anchor_var}', 'Dependent_Variable', 'Avg_Dependent_By_Perf']
+                                    available_display_columns = [col for col in display_columns if col in panel_data.columns]
+                                    st.dataframe(panel_data[available_display_columns].head(20), use_container_width=True)
+                                    
+                                    # Download panel data
+                                    st.subheader("Download Panel Data")
+                                    
+                                    col_panel_download1, col_panel_download2 = st.columns(2)
+                                    
+                                    with col_panel_download1:
+                                        panel_csv_buffer = io.StringIO()
+                                        panel_data.to_csv(panel_csv_buffer, index=False)
+                                        st.download_button(
+                                            label="Download Panel Data (CSV)",
+                                            data=panel_csv_buffer.getvalue(),
+                                            file_name=f"panel_data_{datetime.date.today().strftime('%Y%m%d')}.csv",
+                                            mime="text/csv",
+                                            use_container_width=True
+                                        )
+                                    
+                                    with col_panel_download2:
+                                        panel_excel_buffer = io.BytesIO()
+                                        with pd.ExcelWriter(panel_excel_buffer, engine='xlsxwriter') as writer:
+                                            panel_data.to_excel(writer, sheet_name='Panel_Data', index=False)
+                                            if 'transformed_data' in st.session_state:
+                                                st.session_state.transformed_data.to_excel(writer, sheet_name='Transformed_Data', index=True)
+                                            if 'stationarity_results' in st.session_state:
+                                                st.session_state.stationarity_results.to_excel(writer, sheet_name='Stationarity_Results', index=False)
+                                        st.download_button(
+                                            label="Download Complete Dataset (Excel)",
+                                            data=panel_excel_buffer.getvalue(),
+                                            file_name=f"complete_dataset_{datetime.date.today().strftime('%Y%m%d')}.xlsx",
+                                            mime="application/vnd.openxmlformats-officedocument.sheetml.sheet",
+                                            use_container_width=True
+                                        )
+                                
                                 except Exception as e:
-                                    st.error(f"Error creating dependent variable data: {e}")
-                                    st.write(f"Debug info - panel_data_source index type: {type(panel_data_source.index)}")
-                                    st.write(f"Debug info - panel_data_source columns: {list(panel_data_source.columns)}")
-                                    st.stop()
-                                
-                                # Merge dependent variable to panel data
-                                panel_data = panel_data.merge(
-                                    dependent_data[['Calendar_Qtr', 'Dependent_Variable']], 
-                                    on='Calendar_Qtr', 
-                                    how='left'
-                                )
-                                
-                                # Calculate average dependent variable by performance quarter
-                                avg_dependent_by_perf = panel_data.groupby('Performance_Quarter')['Dependent_Variable'].mean().reset_index()
-                                avg_dependent_by_perf = avg_dependent_by_perf.rename(columns={'Dependent_Variable': 'Avg_Dependent_By_Perf'})
-                                
-                                # Merge average dependent variable back to panel data
-                                panel_data = panel_data.merge(avg_dependent_by_perf, on='Performance_Quarter', how='left')
-                                
-                                # Store in session state
-                                st.session_state.panel_data = panel_data
-                                
-                                st.success(f"Panel data created successfully! {len(panel_data)} observations.")
-                                
-                                # Display panel data summary
-                                st.subheader("Panel Data Summary")
-                                
-                                col_panel1, col_panel2, col_panel3 = st.columns(3)
-                                
-                                with col_panel1:
-                                    st.metric("Total Observations", len(panel_data))
-                                    st.metric("Unique Snapshots", panel_data['Snapshot_Date'].nunique())
-                                    st.metric("Anchor Variable", cleaned_anchor_var)
-                                
-                                with col_panel2:
-                                    st.metric("Performance Quarters", panel_data['Performance_Quarter'].max())
-                                    st.metric("Macro Variables", len(macro_transformations))
-                                    st.metric("Dependent Variable", cleaned_dependent_var)
-                                
-                                with col_panel3:
-                                    st.metric("Date Range", f"{panel_data['Snapshot_Date'].min()} to {panel_data['Snapshot_Date'].max()}")
-                                    st.metric("Total Variables", len(panel_data.columns))
-                                
-                                # Display panel data structure
-                                st.subheader("Panel Data Structure")
-                                st.write("""
-                                **Panel Data Components:**
-                                - **Snapshot Variables**: Anchor variable at time T (constant across performance quarters)
-                                - **Performance Variables**: Macro transformations aligned to calendar quarter (T+k)
-                                - **Dependent Variable**: Merged by calendar quarter
-                                - **Average Dependent**: Average dependent variable by performance quarter
-                                """)
-                                
-                                # Display sample of panel data
-                                st.subheader("Panel Data Preview")
-                                display_columns = ['Snapshot_Date', 'Performance_Quarter', 'Calendar_Qtr', f'Snapshot_{cleaned_anchor_var}', 'Dependent_Variable', 'Avg_Dependent_By_Perf']
-                                available_display_columns = [col for col in display_columns if col in panel_data.columns]
-                                st.dataframe(panel_data[available_display_columns].head(20), use_container_width=True)
-                                
-                                # Download panel data
-                                st.subheader("Download Panel Data")
-                                
-                                col_panel_download1, col_panel_download2 = st.columns(2)
-                                
-                                with col_panel_download1:
-                                    panel_csv_buffer = io.StringIO()
-                                    panel_data.to_csv(panel_csv_buffer, index=False)
-                                    st.download_button(
-                                        label="Download Panel Data (CSV)",
-                                        data=panel_csv_buffer.getvalue(),
-                                        file_name=f"panel_data_{datetime.date.today().strftime('%Y%m%d')}.csv",
-                                        mime="text/csv",
-                                        use_container_width=True
-                                    )
-                                
-                                with col_panel_download2:
-                                    panel_excel_buffer = io.BytesIO()
-                                    with pd.ExcelWriter(panel_excel_buffer, engine='xlsxwriter') as writer:
-                                        panel_data.to_excel(writer, sheet_name='Panel_Data', index=False)
-                                        if 'transformed_data' in st.session_state:
-                                            st.session_state.transformed_data.to_excel(writer, sheet_name='Transformed_Data', index=True)
-                                        if 'stationarity_results' in st.session_state:
-                                            st.session_state.stationarity_results.to_excel(writer, sheet_name='Stationarity_Results', index=False)
-                                    st.download_button(
-                                        label="Download Complete Dataset (Excel)",
-                                        data=panel_excel_buffer.getvalue(),
-                                        file_name=f"complete_dataset_{datetime.date.today().strftime('%Y%m%d')}.xlsx",
-                                        mime="application/vnd.openxmlformats-officedocument.sheetml.sheet",
-                                        use_container_width=True
-                                    )
-                                
-                            except Exception as e:
-                                st.error(f"Error during panel data creation: {e}")
-                    else:
-                        st.warning("Please run Macro Transformations first to create the transformed dataset.")
-        else:
-            st.warning("Please select both dependent and predictor variables to proceed with transformations.")
+                                    st.error(f"Error during panel data creation: {e}")
+                        else:
+                            st.warning("Please run Macro Transformations first to create the transformed dataset.")
+            else:
+                st.warning("Please select both dependent and predictor variables to proceed with transformations.")
 
     # --- Notes Section ---
     st.header("5. Notes")
