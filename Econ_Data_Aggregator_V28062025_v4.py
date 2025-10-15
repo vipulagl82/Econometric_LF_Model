@@ -946,8 +946,16 @@ elif st.session_state.screen == 'analysis':
                             # Step 2: Create aliases
                             aliases = create_variable_aliases()
                             
-                            # Step 3: Create macro transformations
-                            transformed_data = create_macro_transformations(transform_data_cleaned, predictor_variables)
+                            # Step 3: Map predictor variables to cleaned names
+                            cleaned_predictor_vars = []
+                            for var in predictor_variables:
+                                if var in cleaned_names:
+                                    cleaned_predictor_vars.append(cleaned_names[var])
+                                else:
+                                    cleaned_predictor_vars.append(var)
+                            
+                            # Step 4: Create macro transformations
+                            transformed_data = create_macro_transformations(transform_data_cleaned, cleaned_predictor_vars)
                             
                             # Step 4: Test stationarity
                             all_vars = list(transformed_data.columns)
@@ -961,6 +969,7 @@ elif st.session_state.screen == 'analysis':
                             st.session_state.transformed_data = final_transformed_data
                             st.session_state.stationarity_results = stationarity_results
                             st.session_state.aliases = aliases
+                            st.session_state.cleaned_names = cleaned_names
                             
                             st.success(f"Macro transformations completed! {len(stationary_vars)} stationary variables retained.")
                             
@@ -1034,16 +1043,34 @@ elif st.session_state.screen == 'analysis':
                     if 'transformed_data' in st.session_state:
                         with st.spinner("Creating panel data..."):
                             try:
+                                # Get cleaned names from session state
+                                cleaned_names = st.session_state.get('cleaned_names', {})
+                                
+                                # Map dependent variable to cleaned name
+                                cleaned_dependent_var = None
+                                if dependent_variable in cleaned_names:
+                                    cleaned_dependent_var = cleaned_names[dependent_variable]
+                                else:
+                                    cleaned_dependent_var = dependent_variable
+                                
+                                # Map predictor variables to cleaned names
+                                cleaned_predictor_vars = []
+                                for var in predictor_variables:
+                                    if var in cleaned_names:
+                                        cleaned_predictor_vars.append(cleaned_names[var])
+                                    else:
+                                        cleaned_predictor_vars.append(var)
+                                
                                 # Create panel data
                                 panel_data = create_panel_data(
                                     st.session_state.transformed_data,
-                                    dependent_variable,
-                                    predictor_variables,
+                                    cleaned_dependent_var,
+                                    cleaned_predictor_vars,
                                     performance_quarters=13
                                 )
                                 
                                 # Calculate empirical loss rates
-                                loss_rates = calculate_empirical_loss_rate(panel_data, dependent_variable)
+                                loss_rates = calculate_empirical_loss_rate(panel_data, cleaned_dependent_var)
                                 
                                 # Add loss rates to panel data
                                 panel_data['Empirical_Loss_Rate'] = panel_data['Performance_Quarter'].map(loss_rates)
