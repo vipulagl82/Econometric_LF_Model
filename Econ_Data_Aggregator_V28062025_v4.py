@@ -244,115 +244,238 @@ def clean_variable_names(df):
     return cleaned_columns
 
 def create_variable_aliases():
-    """Create alias names for variables"""
+    """Create comprehensive aliases for all variables"""
     aliases = {
-        'GDP_Nominal_GDP_Billions_of_Dollars': 'GDP',
+        # GDP Variables
+        'GDP_Nominal_GDP_Billions_of_Dollars': 'GDPN',
         'GDP_Real_GDP_Billions_of_Chained_2017_Dollars': 'RGDP',
-        'Unemployment_Rate_Civilian_Unemployment_Rate': 'UNRATE',
+        
+        # Labor Market Variables
+        'Unemployment_Rate_Civilian_Unemployment_Rate': 'UR',
+        'Unemployment_Rate': 'UR',
+        
+        # Inflation Variables
         'Inflation_CPI_Year_over_Year': 'CPI',
+        'Consumer_Price_Index': 'CPI',
+        'CPI': 'CPI',
+        
+        # Interest Rate Variables
         'Interest_Rates_Effective_Federal_Funds_Rate': 'FFR',
+        'Federal_Funds_Rate': 'FFR',
+        'Interest_Rate': 'IR',
+        
+        # Retail and Sales Variables
         'Retail_Sales_Total_Retail_Sales_Millions_of_Dollars': 'RS',
+        'Retail_Sales': 'RS',
+        
+        # Housing Variables
         'HPI_SP_Case_Shiller_US_National_Home_Price_Index': 'HPI',
+        'Home_Price_Index': 'HPI',
+        'HPI': 'HPI',
+        
+        # Income Variables
         'Real_Disposable_Personal_Income_Billions_of_Chained_2017_Dollars': 'DPI',
+        'Disposable_Personal_Income': 'DPI',
+        
+        # Consumer Sentiment
         'Consumer_Sentiment_University_of_Michigan': 'CSENT',
+        'Consumer_Sentiment': 'CSENT',
+        'UMCSENT': 'CSENT',
+        
+        # Credit Card Variables
         'Credit_Card_Delinquency_Rate': 'CCDR',
         'Credit_Card_Charge_Off_Rate': 'CCCO',
+        
+        # Mortgage Variables
         'Mortgage_Delinquency_Rate': 'MDR',
-        'Mortgage_Charge_Off_Rate': 'MCO'
+        'Mortgage_Charge_Off_Rate': 'MCO',
+        
+        # Additional Common Variables
+        'Industrial_Production_Index': 'IPI',
+        'Personal_Consumption_Expenditures': 'PCE',
+        'Gross_Domestic_Product': 'GDP',
+        'Consumer_Confidence_Index': 'CCI',
+        'Business_Confidence_Index': 'BCI',
+        'Trade_Balance': 'TB',
+        'Current_Account_Balance': 'CAB',
+        'Government_Debt': 'GD',
+        'Money_Supply_M1': 'M1',
+        'Money_Supply_M2': 'M2',
+        'Exchange_Rate': 'ER',
+        'Oil_Price': 'OIL',
+        'Gold_Price': 'GOLD',
+        'Stock_Market_Index': 'SMI',
+        'Bond_Yield': 'BY',
+        'Corporate_Bond_Yield': 'CBY',
+        'Treasury_Yield': 'TY'
     }
     return aliases
 
-def create_macro_transformations(df, predictor_vars):
+def create_alias_metadata():
+    """Create metadata for variable aliases"""
+    metadata = {
+        'GDPN': {
+            'full_name': 'GDP Nominal (Billions of Dollars)',
+            'category': 'Economic Output',
+            'description': 'Nominal Gross Domestic Product in billions of dollars'
+        },
+        'RGDP': {
+            'full_name': 'Real GDP (Billions of Chained 2017 Dollars)',
+            'category': 'Economic Output',
+            'description': 'Real Gross Domestic Product adjusted for inflation'
+        },
+        'UR': {
+            'full_name': 'Unemployment Rate (%)',
+            'category': 'Labor Market',
+            'description': 'Civilian unemployment rate as percentage of labor force'
+        },
+        'CPI': {
+            'full_name': 'Consumer Price Index',
+            'category': 'Inflation',
+            'description': 'Consumer Price Index measuring inflation'
+        },
+        'FFR': {
+            'full_name': 'Federal Funds Rate (%)',
+            'category': 'Interest Rates',
+            'description': 'Effective federal funds rate'
+        },
+        'RS': {
+            'full_name': 'Retail Sales (Millions of Dollars)',
+            'category': 'Consumption',
+            'description': 'Total retail sales in millions of dollars'
+        },
+        'HPI': {
+            'full_name': 'Home Price Index',
+            'category': 'Housing',
+            'description': 'S&P/Case-Shiller U.S. National Home Price Index'
+        },
+        'DPI': {
+            'full_name': 'Disposable Personal Income (Billions of Dollars)',
+            'category': 'Income',
+            'description': 'Real disposable personal income'
+        },
+        'CSENT': {
+            'full_name': 'Consumer Sentiment Index',
+            'category': 'Consumer Confidence',
+            'description': 'University of Michigan Consumer Sentiment Index'
+        },
+        'CCDR': {
+            'full_name': 'Credit Card Delinquency Rate (%)',
+            'category': 'Credit Risk',
+            'description': 'Credit card delinquency rate as percentage'
+        },
+        'CCCO': {
+            'full_name': 'Credit Card Charge-Off Rate (%)',
+            'category': 'Credit Risk',
+            'description': 'Credit card charge-off rate as percentage'
+        },
+        'MDR': {
+            'full_name': 'Mortgage Delinquency Rate (%)',
+            'category': 'Credit Risk',
+            'description': 'Mortgage delinquency rate as percentage'
+        },
+        'MCO': {
+            'full_name': 'Mortgage Charge-Off Rate (%)',
+            'category': 'Credit Risk',
+            'description': 'Mortgage charge-off rate as percentage'
+        }
+    }
+    return metadata
+
+def create_macro_transformations(df, predictor_vars, aliases=None):
     """Create all macro transformations for predictor variables only"""
     transformed_df = df.copy()
     
     for var in predictor_vars:
         if var not in df.columns:
             continue
+        
+        # Get alias for the variable
+        var_alias = aliases.get(var, var) if aliases else var
             
         # Step 1: Create basic transformations
         # YoY percentage change (t1 suffix)
         yoy_pct = df[var].pct_change(periods=4) * 100
-        transformed_df[f"{var}_YoY_t1"] = yoy_pct
+        transformed_df[f"{var_alias}_YoY_t1"] = yoy_pct
         
         # QoQ percentage change (t1 suffix)
         qoq_pct = df[var].pct_change(periods=1) * 100
-        transformed_df[f"{var}_QoQ_t1"] = qoq_pct
+        transformed_df[f"{var_alias}_QoQ_t1"] = qoq_pct
         
         # YoY level difference (t2 suffix)
         yoy_diff = df[var].diff(periods=4)
-        transformed_df[f"{var}_YoY_t2"] = yoy_diff
+        transformed_df[f"{var_alias}_YoY_t2"] = yoy_diff
         
         # QoQ level difference (t2 suffix)
         qoq_diff = df[var].diff(periods=1)
-        transformed_df[f"{var}_QoQ_t2"] = qoq_diff
+        transformed_df[f"{var_alias}_QoQ_t2"] = qoq_diff
         
         # Step 2: Create moving averages for all base transformations
         # Moving averages for raw variable
         for window in [1, 2, 3, 4]:
-            transformed_df[f"{var}_w{window}"] = df[var].rolling(window=window).mean()
+            transformed_df[f"{var_alias}_w{window}"] = df[var].rolling(window=window).mean()
         
         # Moving averages for YoY percentage change
         for window in [1, 2, 3, 4]:
-            transformed_df[f"{var}_YoY_t1_w{window}"] = yoy_pct.rolling(window=window).mean()
+            transformed_df[f"{var_alias}_YoY_t1_w{window}"] = yoy_pct.rolling(window=window).mean()
         
         # Moving averages for QoQ percentage change
         for window in [1, 2, 3, 4]:
-            transformed_df[f"{var}_QoQ_t1_w{window}"] = qoq_pct.rolling(window=window).mean()
+            transformed_df[f"{var_alias}_QoQ_t1_w{window}"] = qoq_pct.rolling(window=window).mean()
         
         # Moving averages for YoY level difference
         for window in [1, 2, 3, 4]:
-            transformed_df[f"{var}_YoY_t2_w{window}"] = yoy_diff.rolling(window=window).mean()
+            transformed_df[f"{var_alias}_YoY_t2_w{window}"] = yoy_diff.rolling(window=window).mean()
         
         # Moving averages for QoQ level difference
         for window in [1, 2, 3, 4]:
-            transformed_df[f"{var}_QoQ_t2_w{window}"] = qoq_diff.rolling(window=window).mean()
+            transformed_df[f"{var_alias}_QoQ_t2_w{window}"] = qoq_diff.rolling(window=window).mean()
         
         # Step 3: Create lags for all transformations (raw + all moving averages)
         # Lags for raw variable
         for lag in [1, 2, 3, 4]:
-            transformed_df[f"{var}_l{lag}"] = df[var].shift(lag)
+            transformed_df[f"{var_alias}_l{lag}"] = df[var].shift(lag)
         
         # Lags for YoY percentage change
         for lag in [1, 2, 3, 4]:
-            transformed_df[f"{var}_YoY_t1_l{lag}"] = yoy_pct.shift(lag)
+            transformed_df[f"{var_alias}_YoY_t1_l{lag}"] = yoy_pct.shift(lag)
         
         # Lags for QoQ percentage change
         for lag in [1, 2, 3, 4]:
-            transformed_df[f"{var}_QoQ_t1_l{lag}"] = qoq_pct.shift(lag)
+            transformed_df[f"{var_alias}_QoQ_t1_l{lag}"] = qoq_pct.shift(lag)
         
         # Lags for YoY level difference
         for lag in [1, 2, 3, 4]:
-            transformed_df[f"{var}_YoY_t2_l{lag}"] = yoy_diff.shift(lag)
+            transformed_df[f"{var_alias}_YoY_t2_l{lag}"] = yoy_diff.shift(lag)
         
         # Lags for QoQ level difference
         for lag in [1, 2, 3, 4]:
-            transformed_df[f"{var}_QoQ_t2_l{lag}"] = qoq_diff.shift(lag)
+            transformed_df[f"{var_alias}_QoQ_t2_l{lag}"] = qoq_diff.shift(lag)
         
         # Lags for all moving averages of raw variable
         for window in [1, 2, 3, 4]:
             for lag in [1, 2, 3, 4]:
-                transformed_df[f"{var}_w{window}_l{lag}"] = transformed_df[f"{var}_w{window}"].shift(lag)
+                transformed_df[f"{var_alias}_w{window}_l{lag}"] = transformed_df[f"{var_alias}_w{window}"].shift(lag)
         
         # Lags for all moving averages of YoY percentage change
         for window in [1, 2, 3, 4]:
             for lag in [1, 2, 3, 4]:
-                transformed_df[f"{var}_YoY_t1_w{window}_l{lag}"] = transformed_df[f"{var}_YoY_t1_w{window}"].shift(lag)
+                transformed_df[f"{var_alias}_YoY_t1_w{window}_l{lag}"] = transformed_df[f"{var_alias}_YoY_t1_w{window}"].shift(lag)
         
         # Lags for all moving averages of QoQ percentage change
         for window in [1, 2, 3, 4]:
             for lag in [1, 2, 3, 4]:
-                transformed_df[f"{var}_QoQ_t1_w{window}_l{lag}"] = transformed_df[f"{var}_QoQ_t1_w{window}"].shift(lag)
+                transformed_df[f"{var_alias}_QoQ_t1_w{window}_l{lag}"] = transformed_df[f"{var_alias}_QoQ_t1_w{window}"].shift(lag)
         
         # Lags for all moving averages of YoY level difference
         for window in [1, 2, 3, 4]:
             for lag in [1, 2, 3, 4]:
-                transformed_df[f"{var}_YoY_t2_w{window}_l{lag}"] = transformed_df[f"{var}_YoY_t2_w{window}"].shift(lag)
+                transformed_df[f"{var_alias}_YoY_t2_w{window}_l{lag}"] = transformed_df[f"{var_alias}_YoY_t2_w{window}"].shift(lag)
         
         # Lags for all moving averages of QoQ level difference
         for window in [1, 2, 3, 4]:
             for lag in [1, 2, 3, 4]:
-                transformed_df[f"{var}_QoQ_t2_w{window}_l{lag}"] = transformed_df[f"{var}_QoQ_t2_w{window}"].shift(lag)
+                transformed_df[f"{var_alias}_QoQ_t2_w{window}_l{lag}"] = transformed_df[f"{var_alias}_QoQ_t2_w{window}"].shift(lag)
     
     return transformed_df
 
@@ -658,7 +781,7 @@ elif st.session_state.screen == 'analysis':
             end_date = col_data.index.max().strftime('%Y-%m-%d')
             data_range = f"{start_date} to {end_date}"
             observations = len(col_data)
-        else:
+    else:
             data_range = "No data"
             observations = 0
         
@@ -949,7 +1072,7 @@ elif st.session_state.screen == 'analysis':
                     key="anchor_var_select",
                     help="Variable that remains constant across performance quarters for each snapshot"
                 )
-            else:
+        else:
                 st.warning("No delinquency or charge-off variables found for anchor selection:")
                 anchor_variable = st.selectbox(
                     "Select anchor variable:",
@@ -997,7 +1120,7 @@ elif st.session_state.screen == 'analysis':
                                     cleaned_time_varying_vars.append(var)
                             
                             # Step 4: Create macro transformations for time varying variables only
-                            transformed_data = create_macro_transformations(transform_data_cleaned, cleaned_time_varying_vars)
+                            transformed_data = create_macro_transformations(transform_data_cleaned, cleaned_time_varying_vars, aliases)
                             
                             # Step 4: Test stationarity
                             all_vars = list(transformed_data.columns)
@@ -1021,6 +1144,15 @@ elif st.session_state.screen == 'analysis':
                             # Remove rows where any variable is missing
                             final_transformed_data = final_transformed_data.dropna()
                             
+                            # Rename original variables to use aliases
+                            rename_dict = {}
+                            for original_name, alias in aliases.items():
+                                if original_name in final_transformed_data.columns:
+                                    rename_dict[original_name] = alias
+                            
+                            if rename_dict:
+                                final_transformed_data = final_transformed_data.rename(columns=rename_dict)
+                            
                             # Ensure index is properly formatted as datetime for panel data creation
                             if not hasattr(final_transformed_data.index, 'year'):
                                 # If index is not datetime-like, convert it
@@ -1034,6 +1166,7 @@ elif st.session_state.screen == 'analysis':
                             st.session_state.transformed_data = final_transformed_data
                             st.session_state.stationarity_results = stationarity_results
                             st.session_state.aliases = aliases
+                            st.session_state.alias_metadata = create_alias_metadata()
                             st.session_state.cleaned_names = cleaned_names
                             st.session_state.transform_data = transform_data  # Store original data for panel creation
                             
@@ -1057,6 +1190,33 @@ elif st.session_state.screen == 'analysis':
                             # Display stationarity results
                             st.subheader("Stationarity Test Results")
                             st.dataframe(stationarity_results, use_container_width=True, hide_index=True)
+                            
+                            # Display alias metadata
+                            st.subheader("Variable Alias Reference")
+                            alias_metadata = st.session_state.alias_metadata
+                            
+                            # Create a DataFrame for better display
+                            alias_df = pd.DataFrame([
+                                {
+                                    'Alias': alias,
+                                    'Full Name': metadata['full_name'],
+                                    'Category': metadata['category'],
+                                    'Description': metadata['description']
+                                }
+                                for alias, metadata in alias_metadata.items()
+                            ])
+                            
+                            st.dataframe(alias_df, use_container_width=True, hide_index=True)
+                            
+                            # Download alias metadata
+                            alias_csv_buffer = io.StringIO()
+                            alias_df.to_csv(alias_csv_buffer, index=False)
+                            st.download_button(
+                                label="Download Alias Reference (CSV)",
+                                data=alias_csv_buffer.getvalue(),
+                                file_name="variable_aliases_reference.csv",
+                                mime="text/csv"
+                            )
                             
                             # Download options
                             st.subheader("Download Transformation Results")
@@ -1186,7 +1346,7 @@ elif st.session_state.screen == 'analysis':
                                     # Reset index to make it a regular DataFrame
                                     dependent_data = dependent_data.reset_index(drop=True)
                                     
-                                except Exception as e:
+                except Exception as e:
                                     st.error(f"Error creating dependent variable data: {e}")
                                     st.write(f"Debug info - panel_data_source index type: {type(panel_data_source.index)}")
                                     st.write(f"Debug info - panel_data_source columns: {list(panel_data_source.columns)}")
