@@ -270,45 +270,89 @@ def create_macro_transformations(df, predictor_vars):
         if var not in df.columns:
             continue
             
+        # Step 1: Create basic transformations
         # YoY percentage change (t1 suffix)
-        transformed_df[f"{var}_YoY_t1"] = df[var].pct_change(periods=4) * 100
+        yoy_pct = df[var].pct_change(periods=4) * 100
+        transformed_df[f"{var}_YoY_t1"] = yoy_pct
         
         # QoQ percentage change (t1 suffix)
-        transformed_df[f"{var}_QoQ_t1"] = df[var].pct_change(periods=1) * 100
+        qoq_pct = df[var].pct_change(periods=1) * 100
+        transformed_df[f"{var}_QoQ_t1"] = qoq_pct
         
         # YoY level difference (t2 suffix)
-        transformed_df[f"{var}_YoY_t2"] = df[var].diff(periods=4)
+        yoy_diff = df[var].diff(periods=4)
+        transformed_df[f"{var}_YoY_t2"] = yoy_diff
         
         # QoQ level difference (t2 suffix)
-        transformed_df[f"{var}_QoQ_t2"] = df[var].diff(periods=1)
+        qoq_diff = df[var].diff(periods=1)
+        transformed_df[f"{var}_QoQ_t2"] = qoq_diff
         
-        # Moving averages for raw and transformed variables
+        # Step 2: Create moving averages for all base transformations
+        # Moving averages for raw variable
         for window in [1, 2, 3, 4]:
-            # Raw variable moving average
             transformed_df[f"{var}_w{window}"] = df[var].rolling(window=window).mean()
-            
-            # YoY change moving average
-            transformed_df[f"{var}_YoY_t1_w{window}"] = transformed_df[f"{var}_YoY_t1"].rolling(window=window).mean()
-            
-            # QoQ change moving average
-            transformed_df[f"{var}_QoQ_t1_w{window}"] = transformed_df[f"{var}_QoQ_t1"].rolling(window=window).mean()
         
-        # Lags for raw and transformed variables
+        # Moving averages for YoY percentage change
+        for window in [1, 2, 3, 4]:
+            transformed_df[f"{var}_YoY_t1_w{window}"] = yoy_pct.rolling(window=window).mean()
+        
+        # Moving averages for QoQ percentage change
+        for window in [1, 2, 3, 4]:
+            transformed_df[f"{var}_QoQ_t1_w{window}"] = qoq_pct.rolling(window=window).mean()
+        
+        # Moving averages for YoY level difference
+        for window in [1, 2, 3, 4]:
+            transformed_df[f"{var}_YoY_t2_w{window}"] = yoy_diff.rolling(window=window).mean()
+        
+        # Moving averages for QoQ level difference
+        for window in [1, 2, 3, 4]:
+            transformed_df[f"{var}_QoQ_t2_w{window}"] = qoq_diff.rolling(window=window).mean()
+        
+        # Step 3: Create lags for all transformations (raw + all moving averages)
+        # Lags for raw variable
         for lag in [1, 2, 3, 4]:
-            # Raw variable lag
             transformed_df[f"{var}_l{lag}"] = df[var].shift(lag)
-            
-            # YoY change lag
-            transformed_df[f"{var}_YoY_t1_l{lag}"] = transformed_df[f"{var}_YoY_t1"].shift(lag)
-            
-            # QoQ change lag
-            transformed_df[f"{var}_QoQ_t1_l{lag}"] = transformed_df[f"{var}_QoQ_t1"].shift(lag)
-            
-            # YoY level difference lag
-            transformed_df[f"{var}_YoY_t2_l{lag}"] = transformed_df[f"{var}_YoY_t2"].shift(lag)
-            
-            # QoQ level difference lag
-            transformed_df[f"{var}_QoQ_t2_l{lag}"] = transformed_df[f"{var}_QoQ_t2"].shift(lag)
+        
+        # Lags for YoY percentage change
+        for lag in [1, 2, 3, 4]:
+            transformed_df[f"{var}_YoY_t1_l{lag}"] = yoy_pct.shift(lag)
+        
+        # Lags for QoQ percentage change
+        for lag in [1, 2, 3, 4]:
+            transformed_df[f"{var}_QoQ_t1_l{lag}"] = qoq_pct.shift(lag)
+        
+        # Lags for YoY level difference
+        for lag in [1, 2, 3, 4]:
+            transformed_df[f"{var}_YoY_t2_l{lag}"] = yoy_diff.shift(lag)
+        
+        # Lags for QoQ level difference
+        for lag in [1, 2, 3, 4]:
+            transformed_df[f"{var}_QoQ_t2_l{lag}"] = qoq_diff.shift(lag)
+        
+        # Lags for all moving averages of raw variable
+        for window in [1, 2, 3, 4]:
+            for lag in [1, 2, 3, 4]:
+                transformed_df[f"{var}_w{window}_l{lag}"] = transformed_df[f"{var}_w{window}"].shift(lag)
+        
+        # Lags for all moving averages of YoY percentage change
+        for window in [1, 2, 3, 4]:
+            for lag in [1, 2, 3, 4]:
+                transformed_df[f"{var}_YoY_t1_w{window}_l{lag}"] = transformed_df[f"{var}_YoY_t1_w{window}"].shift(lag)
+        
+        # Lags for all moving averages of QoQ percentage change
+        for window in [1, 2, 3, 4]:
+            for lag in [1, 2, 3, 4]:
+                transformed_df[f"{var}_QoQ_t1_w{window}_l{lag}"] = transformed_df[f"{var}_QoQ_t1_w{window}"].shift(lag)
+        
+        # Lags for all moving averages of YoY level difference
+        for window in [1, 2, 3, 4]:
+            for lag in [1, 2, 3, 4]:
+                transformed_df[f"{var}_YoY_t2_w{window}_l{lag}"] = transformed_df[f"{var}_YoY_t2_w{window}"].shift(lag)
+        
+        # Lags for all moving averages of QoQ level difference
+        for window in [1, 2, 3, 4]:
+            for lag in [1, 2, 3, 4]:
+                transformed_df[f"{var}_QoQ_t2_w{window}_l{lag}"] = transformed_df[f"{var}_QoQ_t2_w{window}"].shift(lag)
     
     return transformed_df
 
