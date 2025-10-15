@@ -395,6 +395,9 @@ elif st.session_state.screen == 'analysis':
     - **Dependent Variables**: Credit card and mortgage delinquency and charge-off metrics
     """)
     
+    # Get all columns from the fetched data
+    all_columns = list(final_data.columns)
+    
     # Categorize variables
     credit_columns = [col for col in all_columns if 'delinquency' in col.lower() or 'charge-off' in col.lower()]
     macro_columns = [col for col in all_columns if col not in credit_columns]
