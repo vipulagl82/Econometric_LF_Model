@@ -248,7 +248,7 @@ def create_variable_aliases():
     aliases = {
         'GDP_Nominal_GDP_Billions_of_Dollars': 'GDP',
         'GDP_Real_GDP_Billions_of_Chained_2017_Dollars': 'RGDP',
-        'Unemployment_Rate_Civilian_Unemployment_Rate': 'UNRATE',
+        'Unemployment_Rate_Civilian_Unemployment_Rate': 'UR',
         'Inflation_CPI_Year_over_Year': 'CPI',
         'Interest_Rates_Effective_Federal_Funds_Rate': 'FFR',
         'Retail_Sales_Total_Retail_Sales_Millions_of_Dollars': 'RS',
@@ -1091,7 +1091,7 @@ elif st.session_state.screen == 'analysis':
                                     use_container_width=True
                                 )
                             
-                    except Exception as e:
+                        except Exception as e:
                             st.error(f"Error during macro transformations: {e}")
             
             with col_trans2:
