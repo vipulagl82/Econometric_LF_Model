@@ -1072,7 +1072,7 @@ elif st.session_state.screen == 'analysis':
                     key="anchor_var_select",
                     help="Variable that remains constant across performance quarters for each snapshot"
                 )
-        else:
+            else:
                 st.warning("No delinquency or charge-off variables found for anchor selection:")
                 anchor_variable = st.selectbox(
                     "Select anchor variable:",
@@ -1346,7 +1346,7 @@ elif st.session_state.screen == 'analysis':
                                     # Reset index to make it a regular DataFrame
                                     dependent_data = dependent_data.reset_index(drop=True)
                                     
-                except Exception as e:
+                        except Exception as e:
                                     st.error(f"Error creating dependent variable data: {e}")
                                     st.write(f"Debug info - panel_data_source index type: {type(panel_data_source.index)}")
                                     st.write(f"Debug info - panel_data_source columns: {list(panel_data_source.columns)}")
