@@ -658,7 +658,7 @@ elif st.session_state.screen == 'analysis':
             end_date = col_data.index.max().strftime('%Y-%m-%d')
             data_range = f"{start_date} to {end_date}"
             observations = len(col_data)
-    else:
+        else:
             data_range = "No data"
             observations = 0
         
@@ -949,7 +949,7 @@ elif st.session_state.screen == 'analysis':
                     key="anchor_var_select",
                     help="Variable that remains constant across performance quarters for each snapshot"
                 )
-            else:
+        else:
                 st.warning("No delinquency or charge-off variables found for anchor selection:")
                 anchor_variable = st.selectbox(
                     "Select anchor variable:",
@@ -1172,11 +1172,24 @@ elif st.session_state.screen == 'analysis':
                                 
                                 # Merge dependent variable by calendar quarter
                                 try:
-                                    dependent_data = panel_data_source[[cleaned_dependent_var]].reset_index()
-                                    dependent_data['Calendar_Qtr'] = dependent_data['index'].apply(lambda x: f"{x.year}Q{(x.month - 1) // 3 + 1}")
+                                    # Create dependent variable data with proper calendar quarter formatting
+                                    dependent_data = panel_data_source[[cleaned_dependent_var]].copy()
+                                    
+                                    # Create calendar quarter directly from the index
+                                    dependent_data['Calendar_Qtr'] = dependent_data.index.to_series().apply(
+                                        lambda x: f"{x.year}Q{(x.month - 1) // 3 + 1}"
+                                    )
+                                    
+                                    # Rename the dependent variable column
                                     dependent_data = dependent_data.rename(columns={cleaned_dependent_var: 'Dependent_Variable'})
+                                    
+                                    # Reset index to make it a regular DataFrame
+                                    dependent_data = dependent_data.reset_index(drop=True)
+                                    
                                 except Exception as e:
                                     st.error(f"Error creating dependent variable data: {e}")
+                                    st.write(f"Debug info - panel_data_source index type: {type(panel_data_source.index)}")
+                                    st.write(f"Debug info - panel_data_source columns: {list(panel_data_source.columns)}")
                                     st.stop()
                                 
                                 # Merge dependent variable to panel data
