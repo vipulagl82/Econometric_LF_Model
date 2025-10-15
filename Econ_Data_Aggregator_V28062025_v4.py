@@ -1039,8 +1039,19 @@ elif st.session_state.screen == 'analysis':
         # Variable selection for modeling
         st.subheader("Variable Selection for Modeling")
         
-        all_transform_columns = list(transform_data.columns)
-        credit_columns = [col for col in all_transform_columns if 'delinquency' in col.lower() or 'charge-off' in col.lower()]
+        # Use the final transformed data columns (which have aliases) if available
+        if 'transformed_data' in st.session_state:
+            all_transform_columns = list(st.session_state.transformed_data.columns)
+        else:
+            all_transform_columns = list(transform_data.columns)
+        
+        # For credit columns, look for both original names and aliases
+        credit_columns = []
+        for col in all_transform_columns:
+            if ('delinquency' in col.lower() or 'charge-off' in col.lower() or 
+                col in ['CCDR', 'CCCO', 'MDR', 'MCO']):  # Include common aliases
+                credit_columns.append(col)
+        
         macro_columns = [col for col in all_transform_columns if col not in credit_columns]
         
         col_dep, col_anchor, col_time = st.columns(3)
@@ -1280,7 +1291,10 @@ elif st.session_state.screen == 'analysis':
                                 
                                 # Map anchor variable to alias
                                 cleaned_anchor_var = None
-                                if anchor_variable in aliases:
+                                # Check if the selected variable is already an alias
+                                if anchor_variable in panel_data_source.columns:
+                                    cleaned_anchor_var = anchor_variable
+                                elif anchor_variable in aliases:
                                     cleaned_anchor_var = aliases[anchor_variable]
                                 elif anchor_variable in cleaned_names:
                                     cleaned_anchor_var = cleaned_names[anchor_variable]
@@ -1289,7 +1303,10 @@ elif st.session_state.screen == 'analysis':
                                 
                                 # Map dependent variable to alias
                                 cleaned_dependent_var = None
-                                if dependent_variable in aliases:
+                                # Check if the selected variable is already an alias
+                                if dependent_variable in panel_data_source.columns:
+                                    cleaned_dependent_var = dependent_variable
+                                elif dependent_variable in aliases:
                                     cleaned_dependent_var = aliases[dependent_variable]
                                 elif dependent_variable in cleaned_names:
                                     cleaned_dependent_var = cleaned_names[dependent_variable]
