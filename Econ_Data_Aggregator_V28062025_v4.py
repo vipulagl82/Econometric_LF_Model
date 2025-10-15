@@ -408,34 +408,45 @@ def create_panel_data(df, anchor_var, dependent_var, predictor_vars, performance
     """Create panel data with anchoring and performance quarters"""
     panel_data = []
     
+    # Ensure index is datetime-like for proper date operations
+    if not hasattr(df.index, 'year'):
+        try:
+            df.index = pd.to_datetime(df.index)
+        except:
+            raise ValueError("Index must be datetime-like for panel data creation")
+    
     for snapshot_date in df.index:
-        # Get snapshot date in YYYYQQ format
-        snapshot_quarter = f"{snapshot_date.year}Q{(snapshot_date.month - 1) // 3 + 1}"
-        
-        # Get anchor variable value at snapshot date (time T)
-        anchor_value = df.loc[snapshot_date, anchor_var]
-        
-        for perf_q in range(1, performance_quarters + 1):
-            # Calculate performance date (T + k)
-            perf_date = snapshot_date + pd.DateOffset(months=3 * perf_q)
-            perf_quarter = f"{perf_date.year}Q{(perf_date.month - 1) // 3 + 1}"
+        try:
+            # Get snapshot date in YYYYQQ format
+            snapshot_quarter = f"{snapshot_date.year}Q{(snapshot_date.month - 1) // 3 + 1}"
             
-            # Create row for this snapshot-performance combination
-            row = {
-                'Snapshot_Date': snapshot_quarter,
-                'Performance_Quarter': perf_q,
-                'Calendar_Qtr': perf_quarter,
-                f'Snapshot_{anchor_var}': anchor_value
-            }
+            # Get anchor variable value at snapshot date (time T)
+            anchor_value = df.loc[snapshot_date, anchor_var]
             
-            # Add predictor variables aligned to performance date
-            for var in predictor_vars:
-                if var in df.columns and perf_date in df.index:
-                    row[var] = df.loc[perf_date, var]
-                else:
-                    row[var] = np.nan
-            
-            panel_data.append(row)
+            for perf_q in range(1, performance_quarters + 1):
+                # Calculate performance date (T + k)
+                perf_date = snapshot_date + pd.DateOffset(months=3 * perf_q)
+                perf_quarter = f"{perf_date.year}Q{(perf_date.month - 1) // 3 + 1}"
+                
+                # Create row for this snapshot-performance combination
+                row = {
+                    'Snapshot_Date': snapshot_quarter,
+                    'Performance_Quarter': perf_q,
+                    'Calendar_Qtr': perf_quarter,
+                    f'Snapshot_{anchor_var}': anchor_value
+                }
+                
+                # Add predictor variables aligned to performance date
+                for var in predictor_vars:
+                    if var in df.columns and perf_date in df.index:
+                        row[var] = df.loc[perf_date, var]
+                    else:
+                        row[var] = np.nan
+                
+                panel_data.append(row)
+        except Exception as e:
+            # Skip problematic dates and continue
+            continue
     
     return pd.DataFrame(panel_data)
 
@@ -928,7 +939,7 @@ elif st.session_state.screen == 'analysis':
                     key="anchor_var_select",
                     help="Variable that remains constant across performance quarters for each snapshot"
                 )
-            else:
+        else:
                 st.warning("No delinquency or charge-off variables found for anchor selection:")
                 anchor_variable = st.selectbox(
                     "Select anchor variable:",
@@ -972,7 +983,7 @@ elif st.session_state.screen == 'analysis':
                             for var in time_varying_variables:
                                 if var in cleaned_names:
                                     cleaned_time_varying_vars.append(cleaned_names[var])
-                                else:
+                            else:
                                     cleaned_time_varying_vars.append(var)
                             
                             # Step 4: Create macro transformations for time varying variables only
@@ -989,13 +1000,25 @@ elif st.session_state.screen == 'analysis':
                             # Start with original data and add stationary transformations
                             final_transformed_data = transform_data_cleaned.copy()
                             
-                            # Add stationary transformations
+                            # Add stationary transformations with proper index alignment
                             for var in stationary_vars:
                                 if var in transformed_data.columns:
-                                    final_transformed_data[var] = transformed_data[var]
+                                    # Use intersection of indices to avoid index mismatch
+                                    common_index = final_transformed_data.index.intersection(transformed_data.index)
+                                    if len(common_index) > 0:
+                                        final_transformed_data.loc[common_index, var] = transformed_data.loc[common_index, var]
                             
                             # Remove rows where any variable is missing
                             final_transformed_data = final_transformed_data.dropna()
+                            
+                            # Ensure index is properly formatted as datetime for panel data creation
+                            if not hasattr(final_transformed_data.index, 'year'):
+                                # If index is not datetime-like, convert it
+                                try:
+                                    final_transformed_data.index = pd.to_datetime(final_transformed_data.index)
+                                except:
+                                    # If conversion fails, keep original index
+                                    pass
                             
                             # Store results in session state
                             st.session_state.transformed_data = final_transformed_data
@@ -1068,7 +1091,7 @@ elif st.session_state.screen == 'analysis':
                                     use_container_width=True
                                 )
                             
-                        except Exception as e:
+                except Exception as e:
                             st.error(f"Error during macro transformations: {e}")
             
             with col_trans2:
