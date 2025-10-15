@@ -10,6 +10,7 @@ from statsmodels.tsa.stattools import adfuller
 from docx import Document
 from docx.shared import Inches
 import numpy as np # Added for CSV processing
+import re # For variable name cleanup
 
 # --- Streamlit App Configuration ---\
 st.set_page_config(layout="wide", page_title="FRED Macro Data Downloader & Analyzer")
@@ -227,6 +228,185 @@ def process_uploaded_csv(uploaded_file):
     except Exception as e:
         st.error(f"Error processing CSV file: {e}")
         return None
+
+# --- Data Transformation Helper Functions ---
+def clean_variable_names(df):
+    """Clean variable names by removing special characters except underscore"""
+    cleaned_columns = {}
+    for col in df.columns:
+        # Replace special characters with underscore, keep only alphanumeric and underscore
+        cleaned_name = re.sub(r'[^a-zA-Z0-9_]', '_', col)
+        # Remove multiple consecutive underscores
+        cleaned_name = re.sub(r'_+', '_', cleaned_name)
+        # Remove leading/trailing underscores
+        cleaned_name = cleaned_name.strip('_')
+        cleaned_columns[col] = cleaned_name
+    return cleaned_columns
+
+def create_variable_aliases():
+    """Create alias names for variables"""
+    aliases = {
+        'GDP_Nominal_GDP_Billions_of_Dollars': 'GDP',
+        'GDP_Real_GDP_Billions_of_Chained_2017_Dollars': 'RGDP',
+        'Unemployment_Rate_Civilian_Unemployment_Rate': 'UNRATE',
+        'Inflation_CPI_Year_over_Year': 'CPI',
+        'Interest_Rates_Effective_Federal_Funds_Rate': 'FFR',
+        'Retail_Sales_Total_Retail_Sales_Millions_of_Dollars': 'RS',
+        'HPI_SP_Case_Shiller_US_National_Home_Price_Index': 'HPI',
+        'Real_Disposable_Personal_Income_Billions_of_Chained_2017_Dollars': 'DPI',
+        'Consumer_Sentiment_University_of_Michigan': 'CSENT',
+        'Credit_Card_Delinquency_Rate': 'CCDR',
+        'Credit_Card_Charge_Off_Rate': 'CCCO',
+        'Mortgage_Delinquency_Rate': 'MDR',
+        'Mortgage_Charge_Off_Rate': 'MCO'
+    }
+    return aliases
+
+def create_macro_transformations(df, predictor_vars):
+    """Create all macro transformations for predictor variables only"""
+    transformed_df = df.copy()
+    
+    for var in predictor_vars:
+        if var not in df.columns:
+            continue
+            
+        # YoY percentage change (t1 suffix)
+        transformed_df[f"{var}_YoY_t1"] = df[var].pct_change(periods=4) * 100
+        
+        # QoQ percentage change (t1 suffix)
+        transformed_df[f"{var}_QoQ_t1"] = df[var].pct_change(periods=1) * 100
+        
+        # YoY level difference (t2 suffix)
+        transformed_df[f"{var}_YoY_t2"] = df[var].diff(periods=4)
+        
+        # QoQ level difference (t2 suffix)
+        transformed_df[f"{var}_QoQ_t2"] = df[var].diff(periods=1)
+        
+        # Moving averages for raw and transformed variables
+        for window in [1, 2, 3, 4]:
+            # Raw variable moving average
+            transformed_df[f"{var}_w{window}"] = df[var].rolling(window=window).mean()
+            
+            # YoY change moving average
+            transformed_df[f"{var}_YoY_t1_w{window}"] = transformed_df[f"{var}_YoY_t1"].rolling(window=window).mean()
+            
+            # QoQ change moving average
+            transformed_df[f"{var}_QoQ_t1_w{window}"] = transformed_df[f"{var}_QoQ_t1"].rolling(window=window).mean()
+        
+        # Lags for raw and transformed variables
+        for lag in [1, 2, 3, 4]:
+            # Raw variable lag
+            transformed_df[f"{var}_l{lag}"] = df[var].shift(lag)
+            
+            # YoY change lag
+            transformed_df[f"{var}_YoY_t1_l{lag}"] = transformed_df[f"{var}_YoY_t1"].shift(lag)
+            
+            # QoQ change lag
+            transformed_df[f"{var}_QoQ_t1_l{lag}"] = transformed_df[f"{var}_QoQ_t1"].shift(lag)
+            
+            # YoY level difference lag
+            transformed_df[f"{var}_YoY_t2_l{lag}"] = transformed_df[f"{var}_YoY_t2"].shift(lag)
+            
+            # QoQ level difference lag
+            transformed_df[f"{var}_QoQ_t2_l{lag}"] = transformed_df[f"{var}_QoQ_t2"].shift(lag)
+    
+    return transformed_df
+
+def test_stationarity(df, variables):
+    """Test stationarity for all variables using ADF test"""
+    stationarity_results = []
+    
+    for var in variables:
+        if var not in df.columns:
+            continue
+            
+        series = df[var].dropna()
+        if len(series) < 10:
+            stationarity_results.append({
+                'Variable': var,
+                'ADF_Statistic': 'N/A',
+                'P_Value': 'N/A',
+                'Critical_Values': 'N/A',
+                'Is_Stationary': False,
+                'Reason': 'Insufficient data'
+            })
+            continue
+        
+        try:
+            result = adfuller(series)
+            adf_stat = result[0]
+            p_value = result[1]
+            critical_values = result[4]
+            
+            is_stationary = p_value < 0.05
+            
+            stationarity_results.append({
+                'Variable': var,
+                'ADF_Statistic': round(adf_stat, 4),
+                'P_Value': round(p_value, 4),
+                'Critical_Values': f"1%: {critical_values['1%']:.4f}, 5%: {critical_values['5%']:.4f}, 10%: {critical_values['10%']:.4f}",
+                'Is_Stationary': is_stationary,
+                'Reason': 'Stationary' if is_stationary else 'Non-stationary'
+            })
+        except Exception as e:
+            stationarity_results.append({
+                'Variable': var,
+                'ADF_Statistic': 'N/A',
+                'P_Value': 'N/A',
+                'Critical_Values': 'N/A',
+                'Is_Stationary': False,
+                'Reason': f'Error: {str(e)}'
+            })
+    
+    return pd.DataFrame(stationarity_results)
+
+def create_panel_data(df, dependent_var, predictor_vars, performance_quarters=13):
+    """Create panel data with anchoring and performance quarters"""
+    panel_data = []
+    
+    for snapshot_date in df.index:
+        # Get snapshot date in YYYYQQ format
+        snapshot_quarter = f"{snapshot_date.year}Q{(snapshot_date.month - 1) // 3 + 1}"
+        
+        # Get snapshot variable value (dependent variable at time T)
+        snapshot_value = df.loc[snapshot_date, dependent_var]
+        
+        for perf_q in range(1, performance_quarters + 1):
+            # Calculate performance date (T + k)
+            perf_date = snapshot_date + pd.DateOffset(months=3 * perf_q)
+            perf_quarter = f"{perf_date.year}Q{(perf_date.month - 1) // 3 + 1}"
+            
+            # Create row for this snapshot-performance combination
+            row = {
+                'Snapshot_Date': snapshot_quarter,
+                'Performance_Quarter': perf_q,
+                'Calendar_Qtr': perf_quarter,
+                f'Snapshot_{dependent_var}': snapshot_value
+            }
+            
+            # Add predictor variables aligned to performance date
+            for var in predictor_vars:
+                if var in df.columns and perf_date in df.index:
+                    row[var] = df.loc[perf_date, var]
+                else:
+                    row[var] = np.nan
+            
+            panel_data.append(row)
+    
+    return pd.DataFrame(panel_data)
+
+def calculate_empirical_loss_rate(panel_df, dependent_var, performance_quarters=13):
+    """Calculate empirical loss rate for performance quarters 1 to 13"""
+    # This is a placeholder - in practice, you would calculate actual loss rates
+    # based on your specific methodology
+    loss_rates = {}
+    
+    for perf_q in range(1, performance_quarters + 1):
+        # Example calculation - replace with your actual loss rate calculation
+        # This could be based on charge-off rates, delinquency rates, etc.
+        loss_rates[perf_q] = np.random.uniform(0.01, 0.05)  # Placeholder values
+    
+    return loss_rates
 
 
 # --- Main Application Logic ---
@@ -634,8 +814,262 @@ elif st.session_state.screen == 'analysis':
         use_container_width=True
     )
 
+    # --- Data Transformation Module ---
+    st.header("4. Data Transformation Module")
+    st.write("""
+    This module provides comprehensive data transformations for loss forecasting model development.
+    You can use data from the previous step or upload your own dataset.
+    """)
+    
+    # Data source selection
+    st.subheader("Data Source Selection")
+    transform_data_source = st.radio(
+        "Choose data source for transformations:",
+        ["Use FRED data from previous step", "Upload new CSV file"],
+        key="transform_data_source"
+    )
+    
+    transform_data = None
+    
+    if transform_data_source == "Use FRED data from previous step":
+        if final_data is not None and not final_data.empty:
+            transform_data = final_data.copy()
+            st.success(f"Using FRED data with {len(transform_data)} observations and {len(transform_data.columns)} variables.")
+        else:
+            st.warning("No FRED data available. Please fetch data first or upload a CSV file.")
+    else:
+        uploaded_transform_file = st.file_uploader("Upload CSV file for transformations", type="csv", key="transform_csv")
+        if uploaded_transform_file is not None:
+            with st.spinner("Processing uploaded file..."):
+                transform_data = process_uploaded_csv(uploaded_transform_file)
+                if transform_data is not None and not transform_data.empty:
+                    st.success(f"Uploaded data processed: {len(transform_data)} observations and {len(transform_data.columns)} variables.")
+                else:
+                    st.error("Failed to process the uploaded CSV file.")
+    
+    if transform_data is not None and not transform_data.empty:
+        # Variable selection for modeling
+        st.subheader("Variable Selection for Modeling")
+        
+        all_transform_columns = list(transform_data.columns)
+        credit_columns = [col for col in all_transform_columns if 'delinquency' in col.lower() or 'charge-off' in col.lower()]
+        macro_columns = [col for col in all_transform_columns if col not in credit_columns]
+        
+        col_dep, col_pred = st.columns(2)
+        
+        with col_dep:
+            st.write("**Dependent Variable Selection**")
+            if credit_columns:
+                dependent_variable = st.selectbox(
+                    "Select dependent variable (Y):",
+                    options=credit_columns,
+                    key="dependent_var_select"
+                )
+            else:
+                st.warning("No delinquency or charge-off variables found. Please select from all variables:")
+                dependent_variable = st.selectbox(
+                    "Select dependent variable (Y):",
+                    options=all_transform_columns,
+                    key="dependent_var_select_all"
+                )
+        
+        with col_pred:
+            st.write("**Predictor Variables Selection**")
+            available_predictors = [col for col in all_transform_columns if col != dependent_variable]
+            predictor_variables = st.multiselect(
+                "Select predictor variables (X):",
+                options=available_predictors,
+                default=macro_columns[:3] if macro_columns else available_predictors[:3],
+                key="predictor_vars_select"
+            )
+        
+        if dependent_variable and predictor_variables:
+            st.success(f"Selected {len(predictor_variables)} predictor variables for modeling.")
+            
+            # Transformation buttons
+            st.subheader("Data Transformations")
+            
+            col_trans1, col_trans2 = st.columns(2)
+            
+            with col_trans1:
+                if st.button("🔄 Macro Transformations", type="primary", key="macro_transform_btn"):
+                    with st.spinner("Performing macro transformations..."):
+                        try:
+                            # Step 1: Clean variable names
+                            cleaned_names = clean_variable_names(transform_data)
+                            transform_data_cleaned = transform_data.rename(columns=cleaned_names)
+                            
+                            # Step 2: Create aliases
+                            aliases = create_variable_aliases()
+                            
+                            # Step 3: Create macro transformations
+                            transformed_data = create_macro_transformations(transform_data_cleaned, predictor_variables)
+                            
+                            # Step 4: Test stationarity
+                            all_vars = list(transformed_data.columns)
+                            stationarity_results = test_stationarity(transformed_data, all_vars)
+                            
+                            # Step 5: Keep only stationary variables
+                            stationary_vars = stationarity_results[stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
+                            final_transformed_data = transformed_data[stationary_vars].dropna()
+                            
+                            # Store results in session state
+                            st.session_state.transformed_data = final_transformed_data
+                            st.session_state.stationarity_results = stationarity_results
+                            st.session_state.aliases = aliases
+                            
+                            st.success(f"Macro transformations completed! {len(stationary_vars)} stationary variables retained.")
+                            
+                            # Display results
+                            st.subheader("Transformation Results")
+                            
+                            col_results1, col_results2 = st.columns(2)
+                            
+                            with col_results1:
+                                st.metric("Original Variables", len(transform_data.columns))
+                                st.metric("Transformed Variables", len(transformed_data.columns))
+                                st.metric("Stationary Variables", len(stationary_vars))
+                                st.metric("Final Observations", len(final_transformed_data))
+                            
+                            with col_results2:
+                                st.metric("Variables Dropped", len(transformed_data.columns) - len(stationary_vars))
+                                st.metric("Missing Records Dropped", len(transformed_data) - len(final_transformed_data))
+                            
+                            # Display stationarity results
+                            st.subheader("Stationarity Test Results")
+                            st.dataframe(stationarity_results, use_container_width=True, hide_index=True)
+                            
+                            # Download options
+                            st.subheader("Download Transformation Results")
+                            
+                            col_download1, col_download2, col_download3 = st.columns(3)
+                            
+                            # Download transformed data
+                            with col_download1:
+                                transform_csv_buffer = io.StringIO()
+                                final_transformed_data.to_csv(transform_csv_buffer)
+                                st.download_button(
+                                    label="Download Transformed Data (CSV)",
+                                    data=transform_csv_buffer.getvalue(),
+                                    file_name=f"transformed_data_{datetime.date.today().strftime('%Y%m%d')}.csv",
+                                    mime="text/csv",
+                                    use_container_width=True
+                                )
+                            
+                            # Download stationarity results
+                            with col_download2:
+                                stationarity_csv_buffer = io.StringIO()
+                                stationarity_results.to_csv(stationarity_csv_buffer, index=False)
+                                st.download_button(
+                                    label="Download Stationarity Results (CSV)",
+                                    data=stationarity_csv_buffer.getvalue(),
+                                    file_name=f"stationarity_results_{datetime.date.today().strftime('%Y%m%d')}.csv",
+                                    mime="text/csv",
+                                    use_container_width=True
+                                )
+                            
+                            # Download Excel with multiple sheets
+                            with col_download3:
+                                excel_buffer = io.BytesIO()
+                                with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+                                    final_transformed_data.to_excel(writer, sheet_name='Transformed_Data', index=True)
+                                    stationarity_results.to_excel(writer, sheet_name='Stationarity_Results', index=False)
+                                st.download_button(
+                                    label="Download All Results (Excel)",
+                                    data=excel_buffer.getvalue(),
+                                    file_name=f"transformation_results_{datetime.date.today().strftime('%Y%m%d')}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.sheetml.sheet",
+                                    use_container_width=True
+                                )
+                            
+                        except Exception as e:
+                            st.error(f"Error during macro transformations: {e}")
+            
+            with col_trans2:
+                if st.button("📊 Panel Data Creation", type="primary", key="panel_data_btn"):
+                    if 'transformed_data' in st.session_state:
+                        with st.spinner("Creating panel data..."):
+                            try:
+                                # Create panel data
+                                panel_data = create_panel_data(
+                                    st.session_state.transformed_data,
+                                    dependent_variable,
+                                    predictor_variables,
+                                    performance_quarters=13
+                                )
+                                
+                                # Calculate empirical loss rates
+                                loss_rates = calculate_empirical_loss_rate(panel_data, dependent_variable)
+                                
+                                # Add loss rates to panel data
+                                panel_data['Empirical_Loss_Rate'] = panel_data['Performance_Quarter'].map(loss_rates)
+                                
+                                # Store in session state
+                                st.session_state.panel_data = panel_data
+                                
+                                st.success(f"Panel data created successfully! {len(panel_data)} observations.")
+                                
+                                # Display panel data summary
+                                st.subheader("Panel Data Summary")
+                                
+                                col_panel1, col_panel2, col_panel3 = st.columns(3)
+                                
+                                with col_panel1:
+                                    st.metric("Total Observations", len(panel_data))
+                                    st.metric("Unique Snapshots", panel_data['Snapshot_Date'].nunique())
+                                
+                                with col_panel2:
+                                    st.metric("Performance Quarters", panel_data['Performance_Quarter'].max())
+                                    st.metric("Variables", len(panel_data.columns))
+                                
+                                with col_panel3:
+                                    st.metric("Date Range", f"{panel_data['Snapshot_Date'].min()} to {panel_data['Snapshot_Date'].max()}")
+                                
+                                # Display sample of panel data
+                                st.subheader("Panel Data Preview")
+                                st.dataframe(panel_data.head(20), use_container_width=True)
+                                
+                                # Download panel data
+                                st.subheader("Download Panel Data")
+                                
+                                col_panel_download1, col_panel_download2 = st.columns(2)
+                                
+                                with col_panel_download1:
+                                    panel_csv_buffer = io.StringIO()
+                                    panel_data.to_csv(panel_csv_buffer, index=False)
+                                    st.download_button(
+                                        label="Download Panel Data (CSV)",
+                                        data=panel_csv_buffer.getvalue(),
+                                        file_name=f"panel_data_{datetime.date.today().strftime('%Y%m%d')}.csv",
+                                        mime="text/csv",
+                                        use_container_width=True
+                                    )
+                                
+                                with col_panel_download2:
+                                    panel_excel_buffer = io.BytesIO()
+                                    with pd.ExcelWriter(panel_excel_buffer, engine='xlsxwriter') as writer:
+                                        panel_data.to_excel(writer, sheet_name='Panel_Data', index=False)
+                                        if 'transformed_data' in st.session_state:
+                                            st.session_state.transformed_data.to_excel(writer, sheet_name='Transformed_Data', index=True)
+                                        if 'stationarity_results' in st.session_state:
+                                            st.session_state.stationarity_results.to_excel(writer, sheet_name='Stationarity_Results', index=False)
+                                    st.download_button(
+                                        label="Download Complete Dataset (Excel)",
+                                        data=panel_excel_buffer.getvalue(),
+                                        file_name=f"complete_dataset_{datetime.date.today().strftime('%Y%m%d')}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.sheetml.sheet",
+                                        use_container_width=True
+                                    )
+                                
+                            except Exception as e:
+                                st.error(f"Error during panel data creation: {e}")
+                    else:
+                        st.warning("Please run Macro Transformations first to create the transformed dataset.")
+        else:
+            st.warning("Please select both dependent and predictor variables to proceed with transformations.")
+
     # --- Notes Section ---
-    st.header("4. Notes")
+    st.header("5. Notes")
     st.write("""
     **About This Application:**
     - This tool is designed for loss forecasting model development
@@ -644,11 +1078,16 @@ elif st.session_state.screen == 'analysis':
     - All data is sourced from FRED (Federal Reserve Economic Data)
     - Data is processed to the selected frequency (Monthly or Quarterly)
     
+    **Data Transformation Features:**
+    - **Macro Transformations**: YoY/QoQ changes, moving averages, lags, stationarity testing
+    - **Panel Data Creation**: Anchoring with performance quarters for loss forecasting
+    - **Export Options**: CSV and Excel downloads for all transformation results
+    
     **Next Steps:**
-    - Download the data using the buttons above
-    - Import into your statistical software (Python, R, SAS, etc.)
+    - Use the transformation module to prepare data for modeling
+    - Download transformed datasets for statistical software
     - Build econometric models to forecast credit losses
-    - Consider lag structures and transformations as needed
+    - Consider the panel data structure for time-series analysis
     """)
 
 # --- Footer ---
