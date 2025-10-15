@@ -1089,22 +1089,25 @@ elif st.session_state.screen == 'analysis':
                                 stationary_vars = st.session_state.stationarity_results[st.session_state.stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
                                 macro_transformations = [var for var in stationary_vars if var not in [cleaned_anchor_var, cleaned_dependent_var]]
                                 
-                                # Add anchor and dependent variables to the transformed data if they're not already there
-                                panel_data_source = st.session_state.transformed_data.copy()
+                                # Create panel data source with proper alignment
+                                # Use the original data as base and add only the stationary macro transformations
+                                original_data = st.session_state.get('transform_data', None)
+                                if original_data is None:
+                                    st.error("Original data not found. Please run macro transformations first.")
+                                    st.stop()
                                 
-                                # Add anchor variable if not in transformed data
-                                if cleaned_anchor_var not in panel_data_source.columns:
-                                    # Get original data to add anchor variable
-                                    original_data = st.session_state.get('transform_data', None)
-                                    if original_data is not None and anchor_variable in original_data.columns:
-                                        panel_data_source[cleaned_anchor_var] = original_data[anchor_variable].values
+                                # Start with original data and add only the stationary macro transformations
+                                panel_data_source = original_data.copy()
                                 
-                                # Add dependent variable if not in transformed data
-                                if cleaned_dependent_var not in panel_data_source.columns:
-                                    # Get original data to add dependent variable
-                                    original_data = st.session_state.get('transform_data', None)
-                                    if original_data is not None and dependent_variable in original_data.columns:
-                                        panel_data_source[cleaned_dependent_var] = original_data[dependent_variable].values
+                                # Add stationary macro transformations to the original data
+                                for var in macro_transformations:
+                                    if var in st.session_state.transformed_data.columns:
+                                        # Align the transformed variable with the original data index
+                                        transformed_var_data = st.session_state.transformed_data[var]
+                                        # Use the intersection of indices to avoid length mismatch
+                                        common_index = panel_data_source.index.intersection(transformed_var_data.index)
+                                        if len(common_index) > 0:
+                                            panel_data_source.loc[common_index, var] = transformed_var_data.loc[common_index]
                                 
                                 st.info(f"Using {len(macro_transformations)} stationary macro transformations for panel data.")
                                 
