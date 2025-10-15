@@ -404,7 +404,7 @@ def test_stationarity(df, variables):
     
     return pd.DataFrame(stationarity_results)
 
-def create_panel_data(df, dependent_var, predictor_vars, performance_quarters=13):
+def create_panel_data(df, anchor_var, dependent_var, predictor_vars, performance_quarters=13):
     """Create panel data with anchoring and performance quarters"""
     panel_data = []
     
@@ -412,8 +412,8 @@ def create_panel_data(df, dependent_var, predictor_vars, performance_quarters=13
         # Get snapshot date in YYYYQQ format
         snapshot_quarter = f"{snapshot_date.year}Q{(snapshot_date.month - 1) // 3 + 1}"
         
-        # Get snapshot variable value (dependent variable at time T)
-        snapshot_value = df.loc[snapshot_date, dependent_var]
+        # Get anchor variable value at snapshot date (time T)
+        anchor_value = df.loc[snapshot_date, anchor_var]
         
         for perf_q in range(1, performance_quarters + 1):
             # Calculate performance date (T + k)
@@ -425,7 +425,7 @@ def create_panel_data(df, dependent_var, predictor_vars, performance_quarters=13
                 'Snapshot_Date': snapshot_quarter,
                 'Performance_Quarter': perf_q,
                 'Calendar_Qtr': perf_quarter,
-                f'Snapshot_{dependent_var}': snapshot_value
+                f'Snapshot_{anchor_var}': anchor_value
             }
             
             # Add predictor variables aligned to performance date
@@ -1046,6 +1046,32 @@ elif st.session_state.screen == 'analysis':
                                 # Get cleaned names from session state
                                 cleaned_names = st.session_state.get('cleaned_names', {})
                                 
+                                # Anchor variable selection
+                                st.subheader("Panel Data Configuration")
+                                
+                                # Get all charge-off and delinquency variables for anchor selection
+                                all_cleaned_columns = list(st.session_state.transformed_data.columns)
+                                anchor_candidates = [col for col in all_cleaned_columns if 'delinquency' in col.lower() or 'charge_off' in col.lower() or 'charge-off' in col.lower()]
+                                
+                                if not anchor_candidates:
+                                    st.error("No charge-off or delinquency variables found for anchor selection.")
+                                    st.stop()
+                                
+                                # Anchor variable selection
+                                anchor_variable = st.selectbox(
+                                    "Select Anchor Variable (Snapshot Variable):",
+                                    options=anchor_candidates,
+                                    key="anchor_var_select",
+                                    help="This variable will be used as the snapshot value (constant across performance quarters)"
+                                )
+                                
+                                # Map anchor variable to cleaned name
+                                cleaned_anchor_var = None
+                                if anchor_variable in cleaned_names:
+                                    cleaned_anchor_var = cleaned_names[anchor_variable]
+                                else:
+                                    cleaned_anchor_var = anchor_variable
+                                
                                 # Map dependent variable to cleaned name
                                 cleaned_dependent_var = None
                                 if dependent_variable in cleaned_names:
@@ -1053,27 +1079,39 @@ elif st.session_state.screen == 'analysis':
                                 else:
                                     cleaned_dependent_var = dependent_variable
                                 
-                                # Map predictor variables to cleaned names
-                                cleaned_predictor_vars = []
-                                for var in predictor_variables:
-                                    if var in cleaned_names:
-                                        cleaned_predictor_vars.append(cleaned_names[var])
-                                    else:
-                                        cleaned_predictor_vars.append(var)
+                                # Get all stationary variables (excluding anchor and dependent variables)
+                                stationary_vars = st.session_state.stationarity_results[st.session_state.stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
+                                macro_transformations = [var for var in stationary_vars if var not in [cleaned_anchor_var, cleaned_dependent_var]]
+                                
+                                st.info(f"Using {len(macro_transformations)} stationary macro transformations for panel data.")
                                 
                                 # Create panel data
                                 panel_data = create_panel_data(
                                     st.session_state.transformed_data,
+                                    cleaned_anchor_var,
                                     cleaned_dependent_var,
-                                    cleaned_predictor_vars,
+                                    macro_transformations,
                                     performance_quarters=13
                                 )
                                 
-                                # Calculate empirical loss rates
-                                loss_rates = calculate_empirical_loss_rate(panel_data, cleaned_dependent_var)
+                                # Merge dependent variable by calendar quarter
+                                dependent_data = st.session_state.transformed_data[[cleaned_dependent_var]].reset_index()
+                                dependent_data['Calendar_Qtr'] = dependent_data['index'].apply(lambda x: f"{x.year}Q{(x.month - 1) // 3 + 1}")
+                                dependent_data = dependent_data.rename(columns={cleaned_dependent_var: 'Dependent_Variable'})
                                 
-                                # Add loss rates to panel data
-                                panel_data['Empirical_Loss_Rate'] = panel_data['Performance_Quarter'].map(loss_rates)
+                                # Merge dependent variable to panel data
+                                panel_data = panel_data.merge(
+                                    dependent_data[['Calendar_Qtr', 'Dependent_Variable']], 
+                                    on='Calendar_Qtr', 
+                                    how='left'
+                                )
+                                
+                                # Calculate average dependent variable by performance quarter
+                                avg_dependent_by_perf = panel_data.groupby('Performance_Quarter')['Dependent_Variable'].mean().reset_index()
+                                avg_dependent_by_perf = avg_dependent_by_perf.rename(columns={'Dependent_Variable': 'Avg_Dependent_By_Perf'})
+                                
+                                # Merge average dependent variable back to panel data
+                                panel_data = panel_data.merge(avg_dependent_by_perf, on='Performance_Quarter', how='left')
                                 
                                 # Store in session state
                                 st.session_state.panel_data = panel_data
@@ -1088,17 +1126,32 @@ elif st.session_state.screen == 'analysis':
                                 with col_panel1:
                                     st.metric("Total Observations", len(panel_data))
                                     st.metric("Unique Snapshots", panel_data['Snapshot_Date'].nunique())
+                                    st.metric("Anchor Variable", cleaned_anchor_var)
                                 
                                 with col_panel2:
                                     st.metric("Performance Quarters", panel_data['Performance_Quarter'].max())
-                                    st.metric("Variables", len(panel_data.columns))
+                                    st.metric("Macro Variables", len(macro_transformations))
+                                    st.metric("Dependent Variable", cleaned_dependent_var)
                                 
                                 with col_panel3:
                                     st.metric("Date Range", f"{panel_data['Snapshot_Date'].min()} to {panel_data['Snapshot_Date'].max()}")
+                                    st.metric("Total Variables", len(panel_data.columns))
+                                
+                                # Display panel data structure
+                                st.subheader("Panel Data Structure")
+                                st.write("""
+                                **Panel Data Components:**
+                                - **Snapshot Variables**: Anchor variable at time T (constant across performance quarters)
+                                - **Performance Variables**: Macro transformations aligned to calendar quarter (T+k)
+                                - **Dependent Variable**: Merged by calendar quarter
+                                - **Average Dependent**: Average dependent variable by performance quarter
+                                """)
                                 
                                 # Display sample of panel data
                                 st.subheader("Panel Data Preview")
-                                st.dataframe(panel_data.head(20), use_container_width=True)
+                                display_columns = ['Snapshot_Date', 'Performance_Quarter', 'Calendar_Qtr', f'Snapshot_{cleaned_anchor_var}', 'Dependent_Variable', 'Avg_Dependent_By_Perf']
+                                available_display_columns = [col for col in display_columns if col in panel_data.columns]
+                                st.dataframe(panel_data[available_display_columns].head(20), use_container_width=True)
                                 
                                 # Download panel data
                                 st.subheader("Download Panel Data")
