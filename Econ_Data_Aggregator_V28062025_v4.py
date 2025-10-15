@@ -1130,7 +1130,7 @@ elif st.session_state.screen == 'analysis':
                             for var in time_varying_variables:
                                 if var in cleaned_names:
                                     cleaned_time_varying_vars.append(cleaned_names[var])
-                            else:
+                                else:
                                     cleaned_time_varying_vars.append(var)
                             
                             # Step 4: Create macro transformations for time varying variables only
@@ -1373,7 +1373,7 @@ elif st.session_state.screen == 'analysis':
                                     # Reset index to make it a regular DataFrame
                                     dependent_data = dependent_data.reset_index(drop=True)
                                     
-                except Exception as e:
+                                except Exception as e:
                                     st.error(f"Error creating dependent variable data: {e}")
                                     st.write(f"Debug info - panel_data_source index type: {type(panel_data_source.index)}")
                                     st.write(f"Debug info - panel_data_source columns: {list(panel_data_source.columns)}")
