@@ -248,7 +248,7 @@ def create_variable_aliases():
     aliases = {
         'GDP_Nominal_GDP_Billions_of_Dollars': 'GDP',
         'GDP_Real_GDP_Billions_of_Chained_2017_Dollars': 'RGDP',
-        'Unemployment_Rate_Civilian_Unemployment_Rate': 'UR',
+        'Unemployment_Rate_Civilian_Unemployment_Rate': 'UNRATE',
         'Inflation_CPI_Year_over_Year': 'CPI',
         'Interest_Rates_Effective_Federal_Funds_Rate': 'FFR',
         'Retail_Sales_Total_Retail_Sales_Millions_of_Dollars': 'RS',
@@ -408,12 +408,19 @@ def create_panel_data(df, anchor_var, dependent_var, predictor_vars, performance
     """Create panel data with anchoring and performance quarters"""
     panel_data = []
     
+    # Validate inputs
+    if df is None or df.empty:
+        raise ValueError("DataFrame is empty or None")
+    
+    if anchor_var not in df.columns:
+        raise ValueError(f"Anchor variable '{anchor_var}' not found in DataFrame columns: {list(df.columns)}")
+    
     # Ensure index is datetime-like for proper date operations
     if not hasattr(df.index, 'year'):
         try:
             df.index = pd.to_datetime(df.index)
-        except:
-            raise ValueError("Index must be datetime-like for panel data creation")
+        except Exception as e:
+            raise ValueError(f"Index must be datetime-like for panel data creation. Error: {e}")
     
     for snapshot_date in df.index:
         try:
@@ -447,6 +454,9 @@ def create_panel_data(df, anchor_var, dependent_var, predictor_vars, performance
         except Exception as e:
             # Skip problematic dates and continue
             continue
+    
+    if not panel_data:
+        raise ValueError("No panel data could be created. Check your data and variable selections.")
     
     return pd.DataFrame(panel_data)
 
@@ -939,7 +949,7 @@ elif st.session_state.screen == 'analysis':
                     key="anchor_var_select",
                     help="Variable that remains constant across performance quarters for each snapshot"
                 )
-            else:
+        else:
                 st.warning("No delinquency or charge-off variables found for anchor selection:")
                 anchor_variable = st.selectbox(
                     "Select anchor variable:",
@@ -1091,7 +1101,7 @@ elif st.session_state.screen == 'analysis':
                                     use_container_width=True
                                 )
                             
-                        except Exception as e:
+                except Exception as e:
                             st.error(f"Error during macro transformations: {e}")
             
             with col_trans2:
@@ -1128,6 +1138,29 @@ elif st.session_state.screen == 'analysis':
                                 
                                 st.info(f"Using {len(macro_transformations)} stationary macro transformations for panel data.")
                                 
+                                # Validate data before panel creation
+                                st.write("**Data Validation:**")
+                                st.write(f"- Panel data source shape: {panel_data_source.shape}")
+                                st.write(f"- Index type: {type(panel_data_source.index)}")
+                                st.write(f"- Anchor variable: {cleaned_anchor_var}")
+                                st.write(f"- Dependent variable: {cleaned_dependent_var}")
+                                st.write(f"- Macro transformations: {len(macro_transformations)}")
+                                
+                                # Check if all required variables exist
+                                missing_vars = []
+                                if cleaned_anchor_var not in panel_data_source.columns:
+                                    missing_vars.append(cleaned_anchor_var)
+                                if cleaned_dependent_var not in panel_data_source.columns:
+                                    missing_vars.append(cleaned_dependent_var)
+                                
+                                for var in macro_transformations:
+                                    if var not in panel_data_source.columns:
+                                        missing_vars.append(var)
+                                
+                                if missing_vars:
+                                    st.error(f"Missing variables in panel data source: {missing_vars}")
+                                    st.stop()
+                                
                                 # Create panel data
                                 panel_data = create_panel_data(
                                     panel_data_source,
@@ -1138,9 +1171,13 @@ elif st.session_state.screen == 'analysis':
                                 )
                                 
                                 # Merge dependent variable by calendar quarter
-                                dependent_data = panel_data_source[[cleaned_dependent_var]].reset_index()
-                                dependent_data['Calendar_Qtr'] = dependent_data['index'].apply(lambda x: f"{x.year}Q{(x.month - 1) // 3 + 1}")
-                                dependent_data = dependent_data.rename(columns={cleaned_dependent_var: 'Dependent_Variable'})
+                                try:
+                                    dependent_data = panel_data_source[[cleaned_dependent_var]].reset_index()
+                                    dependent_data['Calendar_Qtr'] = dependent_data['index'].apply(lambda x: f"{x.year}Q{(x.month - 1) // 3 + 1}")
+                                    dependent_data = dependent_data.rename(columns={cleaned_dependent_var: 'Dependent_Variable'})
+                                except Exception as e:
+                                    st.error(f"Error creating dependent variable data: {e}")
+                                    st.stop()
                                 
                                 # Merge dependent variable to panel data
                                 panel_data = panel_data.merge(
