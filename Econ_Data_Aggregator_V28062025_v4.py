@@ -972,7 +972,7 @@ elif st.session_state.screen == 'analysis':
                             for var in time_varying_variables:
                                 if var in cleaned_names:
                                     cleaned_time_varying_vars.append(cleaned_names[var])
-                            else:
+                                else:
                                     cleaned_time_varying_vars.append(var)
                             
                             # Step 4: Create macro transformations for time varying variables only
@@ -1208,7 +1208,7 @@ elif st.session_state.screen == 'analysis':
                                         use_container_width=True
                                     )
                                 
-            except Exception as e:
+                            except Exception as e:
                                 st.error(f"Error during panel data creation: {e}")
                     else:
                         st.warning("Please run Macro Transformations first to create the transformed dataset.")
