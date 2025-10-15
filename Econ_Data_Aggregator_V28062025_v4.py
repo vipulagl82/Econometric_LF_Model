@@ -949,7 +949,7 @@ elif st.session_state.screen == 'analysis':
                     key="anchor_var_select",
                     help="Variable that remains constant across performance quarters for each snapshot"
                 )
-        else:
+            else:
                 st.warning("No delinquency or charge-off variables found for anchor selection:")
                 anchor_variable = st.selectbox(
                     "Select anchor variable:",
@@ -1101,7 +1101,7 @@ elif st.session_state.screen == 'analysis':
                                     use_container_width=True
                                 )
                             
-                except Exception as e:
+                            except Exception as e:
                             st.error(f"Error during macro transformations: {e}")
             
             with col_trans2:
