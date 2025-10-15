@@ -1208,7 +1208,7 @@ elif st.session_state.screen == 'analysis':
                                         use_container_width=True
                                     )
                                 
-                except Exception as e:
+            except Exception as e:
                                 st.error(f"Error during panel data creation: {e}")
                     else:
                         st.warning("Please run Macro Transformations first to create the transformed dataset.")
