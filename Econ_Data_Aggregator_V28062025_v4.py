@@ -460,6 +460,179 @@ elif st.session_state.screen == 'analysis':
     col_stat1.metric("Total Predictor Variables", len(macro_columns))
     col_stat2.metric("Total Dependent Variables", len(credit_columns))
     col_stat3.metric("Total Variables", len(macro_columns) + len(credit_columns))
+    
+    # --- Descriptive Statistics Table ---
+    st.subheader("Descriptive Statistics")
+    st.write("""
+    Comprehensive statistical summary of all variables including missing values, 
+    central tendency measures, and distribution percentiles.
+    """)
+    
+    # Calculate descriptive statistics
+    desc_stats = []
+    
+    for col in all_columns:
+        col_data = final_data[col].dropna()
+        
+        if len(col_data) > 0:
+            # Basic statistics
+            missing_count = len(final_data[col]) - len(col_data)
+            missing_pct = (missing_count / len(final_data[col])) * 100
+            
+            # Central tendency
+            mean_val = col_data.mean()
+            median_val = col_data.median()
+            
+            # Percentiles
+            p25 = col_data.quantile(0.25)
+            p50 = col_data.quantile(0.50)  # Same as median
+            p75 = col_data.quantile(0.75)
+            p90 = col_data.quantile(0.90)
+            p99 = col_data.quantile(0.99)
+            
+            # Range
+            min_val = col_data.min()
+            max_val = col_data.max()
+            
+            # Standard deviation
+            std_val = col_data.std()
+            
+            desc_stats.append({
+                "Variable": col,
+                "Missing": f"{missing_count} ({missing_pct:.1f}%)",
+                "Count": len(col_data),
+                "Mean": f"{mean_val:.2f}",
+                "Median": f"{median_val:.2f}",
+                "Std Dev": f"{std_val:.2f}",
+                "Min": f"{min_val:.2f}",
+                "P25": f"{p25:.2f}",
+                "P50": f"{p50:.2f}",
+                "P75": f"{p75:.2f}",
+                "P90": f"{p90:.2f}",
+                "P99": f"{p99:.2f}",
+                "Max": f"{max_val:.2f}"
+            })
+        else:
+            # Handle case where column has no data
+            desc_stats.append({
+                "Variable": col,
+                "Missing": f"{len(final_data[col])} (100.0%)",
+                "Count": "0",
+                "Mean": "N/A",
+                "Median": "N/A",
+                "Std Dev": "N/A",
+                "Min": "N/A",
+                "P25": "N/A",
+                "P50": "N/A",
+                "P75": "N/A",
+                "P90": "N/A",
+                "P99": "N/A",
+                "Max": "N/A"
+            })
+    
+    # Create and display descriptive statistics dataframe
+    desc_stats_df = pd.DataFrame(desc_stats)
+    
+    # Display the table with better formatting
+    st.dataframe(
+        desc_stats_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Variable": st.column_config.TextColumn(
+                "Variable Name",
+                width="large",
+                help="Name of the economic indicator"
+            ),
+            "Missing": st.column_config.TextColumn(
+                "Missing Values",
+                width="medium",
+                help="Number and percentage of missing values"
+            ),
+            "Count": st.column_config.TextColumn(
+                "Valid Count",
+                width="small",
+                help="Number of non-missing observations"
+            ),
+            "Mean": st.column_config.TextColumn(
+                "Mean",
+                width="small",
+                help="Arithmetic mean"
+            ),
+            "Median": st.column_config.TextColumn(
+                "Median",
+                width="small",
+                help="50th percentile (middle value)"
+            ),
+            "Std Dev": st.column_config.TextColumn(
+                "Std Dev",
+                width="small",
+                help="Standard deviation"
+            ),
+            "Min": st.column_config.TextColumn(
+                "Min",
+                width="small",
+                help="Minimum value"
+            ),
+            "P25": st.column_config.TextColumn(
+                "25th %ile",
+                width="small",
+                help="25th percentile"
+            ),
+            "P50": st.column_config.TextColumn(
+                "50th %ile",
+                width="small",
+                help="50th percentile (median)"
+            ),
+            "P75": st.column_config.TextColumn(
+                "75th %ile",
+                width="small",
+                help="75th percentile"
+            ),
+            "P90": st.column_config.TextColumn(
+                "90th %ile",
+                width="small",
+                help="90th percentile"
+            ),
+            "P99": st.column_config.TextColumn(
+                "99th %ile",
+                width="small",
+                help="99th percentile"
+            ),
+            "Max": st.column_config.TextColumn(
+                "Max",
+                width="small",
+                help="Maximum value"
+            )
+        }
+    )
+    
+    # Add download option for descriptive statistics
+    st.subheader("Download Descriptive Statistics")
+    col_desc1, col_desc2 = st.columns(2)
+    
+    # CSV download for descriptive stats
+    desc_csv_buffer = io.StringIO()
+    desc_stats_df.to_csv(desc_csv_buffer, index=False)
+    col_desc1.download_button(
+        label="Download Descriptive Stats as CSV", 
+        data=desc_csv_buffer.getvalue(), 
+        file_name=f"descriptive_statistics_{datetime.date.today().strftime('%Y%m%d')}.csv", 
+        mime="text/csv", 
+        use_container_width=True
+    )
+    
+    # Excel download for descriptive stats
+    desc_excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(desc_excel_buffer, engine='xlsxwriter') as writer:
+        desc_stats_df.to_excel(writer, sheet_name='Descriptive Stats', index=False)
+    col_desc2.download_button(
+        label="Download Descriptive Stats as Excel", 
+        data=desc_excel_buffer.getvalue(), 
+        file_name=f"descriptive_statistics_{datetime.date.today().strftime('%Y%m%d')}.xlsx", 
+        mime="application/vnd.openxmlformats-officedocument.sheetml.sheet", 
+        use_container_width=True
+    )
 
     # --- Notes Section ---
     st.header("4. Notes")
