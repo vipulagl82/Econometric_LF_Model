@@ -1116,7 +1116,7 @@ elif st.session_state.screen == 'analysis':
                             for var in time_varying_variables:
                                 if var in cleaned_names:
                                     cleaned_time_varying_vars.append(cleaned_names[var])
-                            else:
+                                else:
                                     cleaned_time_varying_vars.append(var)
                             
                             # Step 4: Create macro transformations for time varying variables only
@@ -1275,16 +1275,23 @@ elif st.session_state.screen == 'analysis':
                                 # Use the selected variables from the variable selection
                                 st.subheader("Panel Data Configuration")
                                 
-                                # Map anchor variable to cleaned name
+                                # Get aliases from session state
+                                aliases = st.session_state.get('aliases', {})
+                                
+                                # Map anchor variable to alias
                                 cleaned_anchor_var = None
-                                if anchor_variable in cleaned_names:
+                                if anchor_variable in aliases:
+                                    cleaned_anchor_var = aliases[anchor_variable]
+                                elif anchor_variable in cleaned_names:
                                     cleaned_anchor_var = cleaned_names[anchor_variable]
                                 else:
                                     cleaned_anchor_var = anchor_variable
                                 
-                                # Map dependent variable to cleaned name
+                                # Map dependent variable to alias
                                 cleaned_dependent_var = None
-                                if dependent_variable in cleaned_names:
+                                if dependent_variable in aliases:
+                                    cleaned_dependent_var = aliases[dependent_variable]
+                                elif dependent_variable in cleaned_names:
                                     cleaned_dependent_var = cleaned_names[dependent_variable]
                                 else:
                                     cleaned_dependent_var = dependent_variable
