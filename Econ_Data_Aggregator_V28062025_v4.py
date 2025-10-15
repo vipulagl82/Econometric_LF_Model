@@ -982,9 +982,20 @@ elif st.session_state.screen == 'analysis':
                             all_vars = list(transformed_data.columns)
                             stationarity_results = test_stationarity(transformed_data, all_vars)
                             
-                            # Step 5: Keep only stationary variables
+                            # Step 5: Create final data with all variables
+                            # Include all original variables (dependent, anchor, time varying) plus stationary transformations
                             stationary_vars = stationarity_results[stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
-                            final_transformed_data = transformed_data[stationary_vars].dropna()
+                            
+                            # Start with original data and add stationary transformations
+                            final_transformed_data = transform_data_cleaned.copy()
+                            
+                            # Add stationary transformations
+                            for var in stationary_vars:
+                                if var in transformed_data.columns:
+                                    final_transformed_data[var] = transformed_data[var]
+                            
+                            # Remove rows where any variable is missing
+                            final_transformed_data = final_transformed_data.dropna()
                             
                             # Store results in session state
                             st.session_state.transformed_data = final_transformed_data
@@ -1089,25 +1100,8 @@ elif st.session_state.screen == 'analysis':
                                 stationary_vars = st.session_state.stationarity_results[st.session_state.stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
                                 macro_transformations = [var for var in stationary_vars if var not in [cleaned_anchor_var, cleaned_dependent_var]]
                                 
-                                # Create panel data source with proper alignment
-                                # Use the original data as base and add only the stationary macro transformations
-                                original_data = st.session_state.get('transform_data', None)
-                                if original_data is None:
-                                    st.error("Original data not found. Please run macro transformations first.")
-                                    st.stop()
-                                
-                                # Start with original data and add only the stationary macro transformations
-                                panel_data_source = original_data.copy()
-                                
-                                # Add stationary macro transformations to the original data
-                                for var in macro_transformations:
-                                    if var in st.session_state.transformed_data.columns:
-                                        # Align the transformed variable with the original data index
-                                        transformed_var_data = st.session_state.transformed_data[var]
-                                        # Use the intersection of indices to avoid length mismatch
-                                        common_index = panel_data_source.index.intersection(transformed_var_data.index)
-                                        if len(common_index) > 0:
-                                            panel_data_source.loc[common_index, var] = transformed_var_data.loc[common_index]
+                                # Use the final transformed data directly (includes all variables)
+                                panel_data_source = st.session_state.transformed_data.copy()
                                 
                                 st.info(f"Using {len(macro_transformations)} stationary macro transformations for panel data.")
                                 
