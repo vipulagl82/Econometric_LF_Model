@@ -1289,6 +1289,9 @@ elif st.session_state.screen == 'analysis':
                                 # Get aliases from session state
                                 aliases = st.session_state.get('aliases', {})
                                 
+                                # Use the final transformed data directly (includes all variables)
+                                panel_data_source = st.session_state.transformed_data.copy()
+                                
                                 # Map anchor variable to alias
                                 cleaned_anchor_var = None
                                 # Check if the selected variable is already an alias
@@ -1316,9 +1319,6 @@ elif st.session_state.screen == 'analysis':
                                 # Get all stationary variables (excluding anchor and dependent variables)
                                 stationary_vars = st.session_state.stationarity_results[st.session_state.stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
                                 macro_transformations = [var for var in stationary_vars if var not in [cleaned_anchor_var, cleaned_dependent_var]]
-                                
-                                # Use the final transformed data directly (includes all variables)
-                                panel_data_source = st.session_state.transformed_data.copy()
                                 
                                 st.info(f"Using {len(macro_transformations)} stationary macro transformations for panel data.")
                                 
