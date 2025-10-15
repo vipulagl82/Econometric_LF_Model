@@ -641,7 +641,7 @@ elif st.session_state.screen == 'analysis':
             data_range = "No data"
             observations = 0
         
-        summary_rows.append({
+            summary_rows.append({
             "Variable Type": "Predictor Variable",
             "Variable Name": col,
             "Data Range": data_range,
