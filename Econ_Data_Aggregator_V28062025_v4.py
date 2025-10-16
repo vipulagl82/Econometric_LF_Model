@@ -1036,74 +1036,88 @@ elif st.session_state.screen == 'analysis':
                     st.error("Failed to process the uploaded CSV file.")
     
     if transform_data is not None and not transform_data.empty:
-        # Variable selection for modeling
-        st.subheader("Variable Selection for Modeling")
+        # Variable selection for modeling - only show after transformations are completed
+        if 'transformed_data' in st.session_state:
+            st.subheader("Variable Selection for Modeling")
+            
+            # Use the final transformed data columns (which have aliases)
+            all_transform_columns = list(st.session_state.transformed_data.columns)
+        else:
+            st.info("Please run macro transformations first to enable variable selection.")
+            all_transform_columns = []
         
-        all_transform_columns = list(transform_data.columns)
-        credit_columns = [col for col in all_transform_columns if 'delinquency' in col.lower() or 'charge-off' in col.lower()]
-        macro_columns = [col for col in all_transform_columns if col not in credit_columns]
-        
-        col_dep, col_anchor, col_time = st.columns(3)
-        
-        with col_dep:
-            st.write("**Dependent Variable Selection**")
-            if credit_columns:
-                dependent_variable = st.selectbox(
-                    "Select dependent variable (Y):",
+        # Only show variable selection if transformations are completed
+        if all_transform_columns:
+            # For credit columns, look for both original names and aliases
+            credit_columns = []
+            for col in all_transform_columns:
+                if ('delinquency' in col.lower() or 'charge-off' in col.lower() or 
+                    col in ['CCDR', 'CCCO', 'MDR', 'MCO']):  # Include common aliases
+                    credit_columns.append(col)
+            
+            macro_columns = [col for col in all_transform_columns if col not in credit_columns]
+            
+            col_dep, col_anchor, col_time = st.columns(3)
+            
+            with col_dep:
+                st.write("**Dependent Variable Selection**")
+                if credit_columns:
+                    dependent_variable = st.selectbox(
+                        "Select dependent variable (Y):",
                 options=credit_columns,
-                    key="dependent_var_select",
-                    help="Target variable for the loss forecasting model"
-                )
-            else:
-                st.warning("No delinquency or charge-off variables found. Please select from all variables:")
-                dependent_variable = st.selectbox(
-                    "Select dependent variable (Y):",
-                    options=all_transform_columns,
-                    key="dependent_var_select_all",
-                    help="Target variable for the loss forecasting model"
-                )
+                        key="dependent_var_select",
+                        help="Target variable for the loss forecasting model"
+                    )
+                else:
+                    st.warning("No delinquency or charge-off variables found. Please select from all variables:")
+                    dependent_variable = st.selectbox(
+                        "Select dependent variable (Y):",
+                        options=all_transform_columns,
+                        key="dependent_var_select_all",
+                        help="Target variable for the loss forecasting model"
+                    )
         
-        with col_anchor:
-            st.write("**Anchor Variable Selection**")
-            if credit_columns:
-                anchor_variable = st.selectbox(
-                    "Select anchor variable:",
-                    options=credit_columns,
-                    key="anchor_var_select",
-                    help="Variable that remains constant across performance quarters for each snapshot"
+            with col_anchor:
+                st.write("**Anchor Variable Selection**")
+                if credit_columns:
+                    anchor_variable = st.selectbox(
+                        "Select anchor variable:",
+                        options=credit_columns,
+                        key="anchor_var_select",
+                        help="Variable that remains constant across performance quarters for each snapshot"
+                    )
+                else:
+                    st.warning("No delinquency or charge-off variables found for anchor selection:")
+                    anchor_variable = st.selectbox(
+                        "Select anchor variable:",
+                        options=all_transform_columns,
+                        key="anchor_var_select_all",
+                        help="Variable that remains constant across performance quarters for each snapshot"
+                    )
+            
+            with col_time:
+                st.write("**Time Varying Variables Selection**")
+                available_time_varying = [col for col in macro_columns if col not in [dependent_variable, anchor_variable]]
+                time_varying_variables = st.multiselect(
+                    "Select time varying variables:",
+                    options=available_time_varying,
+                    default=available_time_varying[:3] if available_time_varying else [],
+                    key="time_varying_vars_select",
+                    help="Macro-economic variables that will undergo transformations"
                 )
-            else:
-                st.warning("No delinquency or charge-off variables found for anchor selection:")
-                anchor_variable = st.selectbox(
-                    "Select anchor variable:",
-                    options=all_transform_columns,
-                    key="anchor_var_select_all",
-                    help="Variable that remains constant across performance quarters for each snapshot"
-                )
-        
-        with col_time:
-            st.write("**Time Varying Variables Selection**")
-            available_time_varying = [col for col in macro_columns if col not in [dependent_variable, anchor_variable]]
-            time_varying_variables = st.multiselect(
-                "Select time varying variables:",
-                options=available_time_varying,
-                default=available_time_varying[:3] if available_time_varying else [],
-                key="time_varying_vars_select",
-                help="Macro-economic variables that will undergo transformations"
-            )
-        
-        if dependent_variable and anchor_variable and time_varying_variables:
-            st.success(f"Selected {len(time_varying_variables)} time varying variables for transformations.")
             
-            # Transformation buttons
-            st.subheader("Data Transformations")
-            
-            col_trans1, col_trans2 = st.columns(2)
-            
-            with col_trans1:
-                if st.button("🔄 Macro Transformations", type="primary", key="macro_transform_btn"):
-                    with st.spinner("Performing macro transformations..."):
-                        try:
+            if dependent_variable and anchor_variable and time_varying_variables:
+                st.success(f"Selected {len(time_varying_variables)} time varying variables for transformations.")
+                
+                # Transformation buttons
+                st.subheader("Data Transformations")
+                
+                col_trans1, col_trans2 = st.columns(2)
+                
+                with col_trans1:
+                    if st.button("🔄 Macro Transformations", type="primary", key="macro_transform_btn"):
+                        with st.spinner("Performing macro transformations..."):
+                            try:
                             # Step 1: Clean variable names
                             cleaned_names = clean_variable_names(transform_data)
                             transform_data_cleaned = transform_data.rename(columns=cleaned_names)
@@ -1116,7 +1130,7 @@ elif st.session_state.screen == 'analysis':
                             for var in time_varying_variables:
                                 if var in cleaned_names:
                                     cleaned_time_varying_vars.append(cleaned_names[var])
-                            else:
+                                else:
                                     cleaned_time_varying_vars.append(var)
                             
                             # Step 4: Create macro transformations for time varying variables only
@@ -1275,16 +1289,32 @@ elif st.session_state.screen == 'analysis':
                                 # Use the selected variables from the variable selection
                                 st.subheader("Panel Data Configuration")
                                 
-                                # Map anchor variable to cleaned name
+                                # Get aliases from session state
+                                aliases = st.session_state.get('aliases', {})
+                                
+                                # Use the final transformed data directly (includes all variables)
+                                panel_data_source = st.session_state.transformed_data.copy()
+                                
+                                # Map anchor variable to alias
                                 cleaned_anchor_var = None
-                                if anchor_variable in cleaned_names:
+                                # Check if the selected variable is already an alias
+                                if anchor_variable in panel_data_source.columns:
+                                    cleaned_anchor_var = anchor_variable
+                                elif anchor_variable in aliases:
+                                    cleaned_anchor_var = aliases[anchor_variable]
+                                elif anchor_variable in cleaned_names:
                                     cleaned_anchor_var = cleaned_names[anchor_variable]
                                 else:
                                     cleaned_anchor_var = anchor_variable
                                 
-                                # Map dependent variable to cleaned name
+                                # Map dependent variable to alias
                                 cleaned_dependent_var = None
-                                if dependent_variable in cleaned_names:
+                                # Check if the selected variable is already an alias
+                                if dependent_variable in panel_data_source.columns:
+                                    cleaned_dependent_var = dependent_variable
+                                elif dependent_variable in aliases:
+                                    cleaned_dependent_var = aliases[dependent_variable]
+                                elif dependent_variable in cleaned_names:
                                     cleaned_dependent_var = cleaned_names[dependent_variable]
                                 else:
                                     cleaned_dependent_var = dependent_variable
@@ -1292,9 +1322,6 @@ elif st.session_state.screen == 'analysis':
                                 # Get all stationary variables (excluding anchor and dependent variables)
                                 stationary_vars = st.session_state.stationarity_results[st.session_state.stationarity_results['Is_Stationary'] == True]['Variable'].tolist()
                                 macro_transformations = [var for var in stationary_vars if var not in [cleaned_anchor_var, cleaned_dependent_var]]
-                                
-                                # Use the final transformed data directly (includes all variables)
-                                panel_data_source = st.session_state.transformed_data.copy()
                                 
                                 st.info(f"Using {len(macro_transformations)} stationary macro transformations for panel data.")
                                 
@@ -1346,7 +1373,7 @@ elif st.session_state.screen == 'analysis':
                                     # Reset index to make it a regular DataFrame
                                     dependent_data = dependent_data.reset_index(drop=True)
                                     
-                        except Exception as e:
+                                except Exception as e:
                                     st.error(f"Error creating dependent variable data: {e}")
                                     st.write(f"Debug info - panel_data_source index type: {type(panel_data_source.index)}")
                                     st.write(f"Debug info - panel_data_source columns: {list(panel_data_source.columns)}")
